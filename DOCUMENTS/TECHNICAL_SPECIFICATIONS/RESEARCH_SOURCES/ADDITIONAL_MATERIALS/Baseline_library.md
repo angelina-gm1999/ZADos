@@ -4,6 +4,7 @@ Ontological, Experiential & Relational Primitives
 Layers 1.1 through 3.5
 ================================================================================
 
+
 PURPOSE
 -------
 This document is the foundational concept library for ZA-DOS. It defines the
