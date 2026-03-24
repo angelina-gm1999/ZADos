@@ -2,6 +2,7 @@ ZA-DOS Cognitive Engines Layer
 Technical Specification v1.0
 Generated: March 23, 2026  |  Status: Code-Verified (6015 tests, 32 engines)
 
+
 1. Consolidated Summary
 The Cognitive Engines Layer contains 32 engines organized into 13 functional clusters. All engines follow Pattern A (canonical interface): update_neurochem_state(Dict[str, float]), process(input) → output, get_status() → Dict. Engines are divided into two packages: py_engines/ (29 runtime engines) and cognitools/ (3 knowledge substrate engines).
 Aspect
