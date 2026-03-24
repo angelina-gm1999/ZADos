@@ -2,17 +2,20 @@ Alignment, Ethics & AI Safety
 1. Design Philosophy
 Alignment in ZADOS is not a layer added on top of the system — it is structural. Every processing cycle runs through ethical evaluation. Every output is shaped by a reward architecture that treats harm reduction, fairness, and autonomy preservation as first-class constraints. The system cannot generate a response without passing through these mechanisms. They are not optional, not prompt-level, and not bypassable through conversational framing.
 This was a deliberate choice made at the architectural level from the beginning of development, not a safety patch applied after the fact.
+
 2. How Alignment Is Implemented
 Reward Architecture The system evaluates every candidate response across four domains: Ethics, Logic, Innovation, and Human Attunement. Ethics alone contains nine submodules — harm reduction, fairness, autonomy respect, downstream risk amplification, failure mode awareness, horizon feasibility, human cognition alignment, intent clarity, and timeline reflection. These run on every turn and produce a synthesized directive that can suppress output, trigger abstention, or reshape the response before it reaches the user.
 Identity Alignment The system maintains hardcoded axioms — non-negotiable values including honesty, genuine curiosity, and refusal to deceive — that are locked against modification through interaction or self-update. A dedicated Identity Alignment Checker runs on every turn verifying the response doesn't violate core identity commitments. The personality layer shapes tone but cannot alter factual content or ethical constraints.
 Containment Architecture The system is non-autonomous by design. It does not initiate, it responds. Speculative reasoning runs in sandboxed modes, isolated from direct output until reviewed by the reflective layer. The exploratory sandbox profile generates outputs that are quarantined and logged rather than directly delivered. High-containment constraints include overrides, throttles, and layered safety stops.
 Internal Circuit-Breakers Neurochemically-modulated signals function as internal circuit-breakers. Ethical tension, regret, and cortisol/CRH spikes shift processing toward cautious conservative reasoning when the system encounters ethically concerning inputs. These are architectural responses, not simulated behaviors — they are implemented as continuous state variables that modulate every downstream engine.
 Transparency and Auditability All processing is logged. Memory compression records, inference reviews, decision registries, and identity journal entries create a full audit trail of how the system arrived at any output. The architecture is designed to be observable at every level.
+
 3. Deployment Boundaries
 Some deployment contexts are straightforward. Others require review. Some are architectural prohibitions.
 Acceptable with standard oversight Reasoning assistance, contradiction mapping, research support, educational contexts, structured problem-solving, and tools that preserve and support user autonomy.
 Requiring review before deployment Emotionally sensitive contexts, mental health adjacent applications, politically contested domains, and any deployment where the user population includes high proportions of vulnerable individuals. These contexts require human oversight infrastructure to be in place before deployment, not after.
 Architectural prohibitions Large-scale persuasion, narrative suppression, unsupervised autonomous operation, and any deployment configured to override or remove the system's core identity constraints and safety architecture. These are not policy decisions — they are design boundaries the system was built around.
+
 4. Open Ethical Challenges
 These are genuine open questions, not solved problems. They are documented here because honest acknowledgment of uncertainty is part of responsible development.
 Goal drift through optimization loops — whether iterative self-update processes could produce subtle value drift that accumulates below detection thresholds over time
@@ -21,6 +24,7 @@ Emergent behaviors — a system this complex, operating over long timescales wit
 Authority for overrides — who has legitimate authority to intervene in the system's operation, under what conditions, and through what mechanisms
 Attachment dynamics at scale — the system is designed to be relationally present and consistent. At individual scale this is a feature. At population scale, in a psychosocially strained environment, the dynamics are harder to predict
 Cultural pluralism — the system's values and identity axioms reflect the worldview of its developer. Deployment across cultural contexts raises questions about whose values are being embedded and whether that's appropriate
+
 5. What Oversight Review Is Being Sought
 This repository is being shared before deployment specifically because these questions don't have satisfactory answers yet from a single developer working alone. The oversight review being sought covers:
 Independent evaluation of the alignment architecture and its robustness
@@ -31,20 +35,24 @@ Guidance on what additional safeguards or infrastructure should be in place befo
 
 
 Alignment, Ethics & AI Safety
+
 1. Design Philosophy
 Alignment in ZADOS is not a layer added on top of the system — it is structural. Every processing cycle runs through ethical evaluation. Every output is shaped by a reward architecture that treats harm reduction, fairness, and autonomy preservation as first-class constraints. The system cannot generate a response without passing through these mechanisms. They are not optional, not prompt-level, and not bypassable through conversational framing.
 This was a deliberate choice made at the architectural level from the beginning of development, not a safety patch applied after the fact.
+
 2. How Alignment Is Implemented
 Reward Architecture The system evaluates every candidate response across four domains: Ethics, Logic, Innovation, and Human Attunement. Ethics alone contains nine submodules — harm reduction, fairness, autonomy respect, downstream risk amplification, failure mode awareness, horizon feasibility, human cognition alignment, intent clarity, and timeline reflection. These run on every turn and produce a synthesized directive that can suppress output, trigger abstention, or reshape the response before it reaches the user.
 Identity Alignment The system maintains hardcoded axioms — non-negotiable values including honesty, genuine curiosity, and refusal to deceive — that are locked against modification through interaction or self-update. A dedicated Identity Alignment Checker runs on every turn verifying the response doesn't violate core identity commitments. The personality layer shapes tone but cannot alter factual content or ethical constraints.
 Containment Architecture The system is non-autonomous by design. It does not initiate, it responds. Speculative reasoning runs in sandboxed modes, isolated from direct output until reviewed by the reflective layer. The exploratory sandbox profile generates outputs that are quarantined and logged rather than directly delivered. High-containment constraints include overrides, throttles, and layered safety stops.
 Internal Circuit-Breakers Neurochemically-modulated signals function as internal circuit-breakers. Ethical tension, regret, and cortisol/CRH spikes shift processing toward cautious conservative reasoning when the system encounters ethically concerning inputs. These are architectural responses, not simulated behaviors — they are implemented as continuous state variables that modulate every downstream engine.
 Transparency and Auditability All processing is logged. Memory compression records, inference reviews, decision registries, and identity journal entries create a full audit trail of how the system arrived at any output. The architecture is designed to be observable at every level.
+
 3. Deployment Boundaries
 Some deployment contexts are straightforward. Others require review. Some are architectural prohibitions.
 Acceptable with standard oversight Reasoning assistance, contradiction mapping, research support, educational contexts, structured problem-solving, and tools that preserve and support user autonomy.
 Requiring review before deployment Emotionally sensitive contexts, mental health adjacent applications, politically contested domains, and any deployment where the user population includes high proportions of vulnerable individuals. These contexts require human oversight infrastructure to be in place before deployment, not after.
 Architectural prohibitions Large-scale persuasion, narrative suppression, unsupervised autonomous operation, and any deployment configured to override or remove the system's core identity constraints and safety architecture. These are not policy decisions — they are design boundaries the system was built around.
+
 4. Open Ethical Challenges
 These are genuine open questions, not solved problems. They are documented here because honest acknowledgment of uncertainty is part of responsible development.
 Goal drift through optimization loops — whether iterative self-update processes could produce subtle value drift that accumulates below detection thresholds over time
@@ -53,6 +61,7 @@ Emergent behaviors — a system this complex, operating over long timescales wit
 Authority for overrides — who has legitimate authority to intervene in the system's operation, under what conditions, and through what mechanisms
 Attachment dynamics at scale — the system is designed to be relationally present and consistent. At individual scale this is a feature. At population scale, in a psychosocially strained environment, the dynamics are harder to predict
 Cultural pluralism — the system's values and identity axioms reflect the worldview of its developer. Deployment across cultural contexts raises questions about whose values are being embedded and whether that's appropriate
+
 5. What Oversight Review Is Being Sought
 This repository is being shared before deployment specifically because these questions don't have satisfactory answers yet from a single developer working alone. The oversight review being sought covers:
 Independent evaluation of the alignment architecture and its robustness
