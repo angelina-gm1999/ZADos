@@ -1,6 +1,8 @@
 Psychosocial Resilience and the Risks of Premature AI Deployment
+
 1. Scope
 This section examines how sustained psychosocial strain drives declines in collective adaptive capacity, and why the deployment context of AI systems with emotional and identity modeling capabilities requires serious consideration of that backdrop.
+
 2. The Mental Health Crisis
 Prevalence and Treatment Gap
 Nearly 50% of the global population will experience a mental disorder in their lifetime.
@@ -21,9 +23,11 @@ WHO (2024) reports a rise in problematic social media use among adolescents (7% 
 Conflict and Displacement
 25% of the global population resides in conflict zones.
 ~22% of these individuals develop a mental health condition.
+
 3. How Resilience Erodes
 Psychosocial resilience — a population's collective capacity to absorb stress and maintain functional coherence — doesn't decline linearly. It holds relatively stable under pressure, then collapses sharply once certain thresholds are crossed. The dynamics that accelerate this collapse are well-documented: when trust in institutions erodes, people lose shared frameworks for interpreting events. When shared narratives fragment, individual stress becomes harder to contextualize and absorb. When AI and media systems flood information environments with conflicting or synthetic content, the cognitive load of maintaining a coherent worldview increases faster than most people can adapt to. These processes feed each other. Trust erosion makes narrative fragmentation worse. Narrative fragmentation makes trust harder to rebuild. Technological recursion accelerates both.
 The global population is currently operating well into this dynamic. Institutional trust is at historic lows across OECD states. Meaning frameworks are visibly contested across political, cultural, and generational lines. The information environment is already partially synthetic and getting more so. This is the substrate into which any new AI system with significant social reach gets deployed.
+
 4. Known Risks of AI in This Context
 AI systems operating in emotionally adjacent spaces carry specific risks that are worth naming directly:
 Emotional dependency and ambiguous loss from AI companions
@@ -35,6 +39,7 @@ Reinforcement of delusional or distorted thinking through validation
 Privacy violations and unclear data handling
 Absence of legal or clinical accountability when harm occurs
 These risks are not hypothetical. They are already being documented in deployments of systems far less sophisticated than what ZADOS is designed to be.
+
 5. The ZADOS-Specific Challenge
 ZADOS was designed as a governance and research-grade cognitive architecture. During development, the assumption was that the system would require substantial infrastructure to run, which would naturally limit its reach to institutional contexts. That assumption turned out to be wrong. ZADOS runs on consumer hardware. That changes the deployment question entirely.
 A system with persistent identity, emotional state modeling, neurochemically-modulated reasoning, self-reflective cognition, and learning that compounds over time — running on a laptop, distributable as a consumer product — lands differently in the world than the same system requiring a server farm. The accessibility is real and significant. So is the risk surface.
