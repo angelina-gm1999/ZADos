@@ -100,9 +100,9 @@ def customize_reward_weights(user_input, reward_system):
             key, value = part.strip().split("=")
             new_weights[key.strip()] = float(value.strip())
         reward_system.weights.update(new_weights)
-        print(f"zados: Reward weights updated: {reward_system.weights}")
+        print(f"valuem: Reward weights updated: {reward_system.weights}")
     except Exception as e:
-        print(f"zados: Failed to update weights. [{e}]")
+        print(f"valuem: Failed to update weights. [{e}]")
 
 # === NEUROTRANSMITTER MANAGER ===
 class NeurotransmitterManager:
@@ -420,15 +420,15 @@ def suggest_paradox_from_input(user_input):
     low_sim_pairs = [(a, b, s) for a, b, s in contrasts if s < 0.4]
     if low_sim_pairs:
         a, b, _ = sorted(low_sim_pairs, key=lambda x: x[2])[0]
-        print(f"zados: I noticed possible symbolic contrast between '{a}' and '{b}'.")
-        resolution = input("zados: What idea connects or resolves them? ").strip().lower()
+        print(f"valuem: I noticed possible symbolic contrast between '{a}' and '{b}'.")
+        resolution = input("valuem: What idea connects or resolves them? ").strip().lower()
         if resolution:
             log_paradox(a, b, resolution)
-            print("zados: Got it. Resolution logged.")
+            print("valuem: Got it. Resolution logged.")
             return f"Symbolic paradox inferred: {a} vs {b} -> {resolution}"
         else:
             symbolic_latency_buffer.append((a, b))
-            print("zados: I'll keep this one in symbolic latency. We can come back to it later.")
+            print("valuem: I'll keep this one in symbolic latency. We can come back to it later.")
             return None
     return None
 
@@ -480,7 +480,7 @@ def revisit_symbolic_latency():
 
 # === MAIN INTERFACE ===
 print(
-    "zados ONLINE. Type 'exit' to shut down, or input a symbolic phrase.\n"
+    "valuem ONLINE. Type 'exit' to shut down, or input a symbolic phrase.\n"
     "Type 'show fractals' to view recent symbolic analyses.\n"
 )
 
@@ -494,7 +494,7 @@ while True:
         continue
 
     if user_input.lower() in {"exit", "quit"}:
-        print("zados: System archived.")
+        print("valuem: System archived.")
         break
 
     if user_input.lower().startswith("show fractals"):
@@ -514,11 +514,11 @@ while True:
             mood, comment, timestamp = memory_manager.get_recent_identity_reflection()
         else:
             mood, comment, timestamp = "neutral", "I have no feelings right now.", time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-        print(f"zados: I am currently feeling {mood}. Reflected on this at {timestamp}:\n→ {comment}")
+        print(f"valuem: I am currently feeling {mood}. Reflected on this at {timestamp}:\n→ {comment}")
         continue
 
     if "what have you been thinking" in user_input.lower() or "what's on your mind" in user_input.lower():
-        print("zados:", revisit_symbolic_latency())
+        print("valuem:", revisit_symbolic_latency())
         continue
 
     if user_input.lower().startswith("customize weights:"):
@@ -526,7 +526,7 @@ while True:
         continue
 
     if "review" in user_input.lower():
-        print("zados (Review):", review_knowledge())
+        print("valuem (Review):", review_knowledge())
         continue
 
     if "switch to" in user_input.lower() and "mode" in user_input.lower():
@@ -537,7 +537,7 @@ while True:
                 recognized = True
                 break
         if not recognized:
-            print("zados: Mode not recognized. Please use one of: balanced, playpretend, ethicstraining, logicsandbox.")
+            print("valuem: Mode not recognized. Please use one of: balanced, playpretend, ethicstraining, logicsandbox.")
         continue
 
     # --- MAIN AI INTERPRETATION LOGIC ---
@@ -557,7 +557,7 @@ while True:
         save_data(MEMORY_FILE, memory_data)
 
     # 3. Print only the LLM's conversational output to user
-    print(f"zados: {ai_reply}")
+    print(f"valuem: {ai_reply}")
 
     # 4. (Optional) Still log and process emotions, contradictions, paradox, etc (no output unless needed)
     emotion = detect_structural_emotion(ai_reply)
@@ -730,24 +730,24 @@ def socratic_reasoning(question_text):
         concept_a, concept_b = entry["concepts"]
         if concept_a in words or concept_b in words:
             resolution = entry["resolution"]
-            print(f"zados: I see a pattern — {concept_a} vs {concept_b} → {resolution}")
-            follow_up = input("zados: Would you like to expand, correct, or leave it? ").strip().lower()
+            print(f"valuem: I see a pattern — {concept_a} vs {concept_b} → {resolution}")
+            follow_up = input("valuem: Would you like to expand, correct, or leave it? ").strip().lower()
             if "expand" in follow_up or "correct" in follow_up:
-                new_resolution = input("zados: What should the updated or extended resolution be? ").strip()
+                new_resolution = input("valuem: What should the updated or extended resolution be? ").strip()
                 annotate_paradox(concept_a, concept_b, f"User revised: {new_resolution}")
-                print("zados: Update logged.")
+                print("valuem: Update logged.")
             else:
-                print("zados: Understood. Keeping current logic.")
+                print("valuem: Understood. Keeping current logic.")
             return
-    print("zados: I don’t yet hold a resolution to that. What’s your view?")
+    print("valuem: I don’t yet hold a resolution to that. What’s your view?")
     user_answer = input("You: ").strip()
     if len(words) >= 2:
         concept_a, concept_b = words[0], words[1]
         log_paradox(concept_a, concept_b, user_answer)
-        print(f"zados: Logged '{concept_a} vs {concept_b} → {user_answer}' as a new symbolic paradox.")
+        print(f"valuem: Logged '{concept_a} vs {concept_b} → {user_answer}' as a new symbolic paradox.")
     else:
         log_reflection(question_text + " → " + user_answer)
-        print("zados: Logged your insight for future symbolic association.")
+        print("valuem: Logged your insight for future symbolic association.")
 
 # === SEMANTIC EXPANSION - REWARD SCORING - LLM TRANSLATION ===
 from typing import List, Dict
