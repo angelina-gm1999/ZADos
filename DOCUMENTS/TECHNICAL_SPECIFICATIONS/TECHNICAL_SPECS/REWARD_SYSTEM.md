@@ -6,7 +6,7 @@ Consolidated Technical Specification
 Version 1.0 — March 23, 2026
 Code-Verified Against 6015-Test Codebase
 
-Consolidated Summary
++ Consolidated Summary
 The reward system defines a multi-domain evaluation, synthesis, and feedback framework that governs ZADOS response quality, behavioral alignment, and neurochemical modulation. It operates through four evaluation domains (Ethics, Logic, Innovation, Human Attunement), a profile-driven synthesis engine, a neurochemical adapter, and reward-conditioned feedback loops that close the loop between evaluation outcomes and the neurochemical substrate.
 At its core, the reward system evaluates every response or cognitive action across 32+ submodules organized into four domains. Each submodule produces a normalized subscore in [0, 1] plus optional severity-tagged flags. Domain results are aggregated via weighted averages controlled by a reward profile, which defines per-domain weights, tolerance thresholds, suppression biases, and abstention biases. Seventeen static profiles are provided, spanning operational, learning, reflection, exploration, ethics-focused, and sleep modes.
 The synthesis engine performs a three-step pipeline: (1) tier classification of each domain score into four influence levels (minimal, moderate, significant, dominant), (2) weighted composite computation, and (3) composite synthesis including flag escalation, suppression/abstention decisions, eight response-shaping directives, and routing hints. The output is a RewardMetaDirective that controls whether output is permitted, how it should be framed, and which downstream pathways are engaged.
