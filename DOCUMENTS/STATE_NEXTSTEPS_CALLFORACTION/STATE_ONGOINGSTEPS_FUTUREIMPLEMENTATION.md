@@ -133,6 +133,7 @@ All core subsystems (neurochemistry, reward, memory, cognition, emotion, learnin
 - **Engine and learning iteration** — refining cognitive engine behavior, learning pipeline quality, and self-reflective processes
 - **Identity and self-reflection research** — ongoing investigation into identity architecture; also waiting for external support and review on classification of identity dimensions (immutable vs. developmental vs. emergent)
 - **User interface** — background development in Godot; development-oriented tooling, not public-facing; early drafts exist
+- **Logic and bias tagging** - implementing a tag system for optimization of logic and bias detection and processing.
 
 ### On Hold (Waiting for Support & Review)
 
