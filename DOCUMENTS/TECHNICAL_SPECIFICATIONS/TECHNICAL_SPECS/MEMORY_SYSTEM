@@ -2,6 +2,7 @@ ZA-DOS Memory Layer Architecture
 Technical Specification v2.0
 Updated: March 23, 2026  |  Status: Code-Verified (6015 tests)
 
+
 Consolidated Summary
 The Memory Layer is the infrastructure substrate that ALL cognitive engines read from and write to. It sits alongside the Neurochemical Layer and Reward System as foundational infrastructure. The memory layer has three temporal tiers (STMM, MTMM, LTMM), each with distinct storage characteristics, retention policies, and access patterns. Additionally, a set of Specialized Log Subsystems and Namespaced LTMM Stores maintain domain-specific records that cross-cut the temporal tiers.
 Aspect
