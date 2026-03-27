@@ -9,7 +9,7 @@ March 2026
 
 ZADOS is a biologically-inspired cognitive architecture built in Python. It wraps large language models in a simulated neurochemical and cognitive processing layer — providing persistent memory, emotional modulation, structured reasoning, reward-conditioned cognition, identity persistence, and adaptive learning. The LLM handles natural language generation only; all cognitive processing happens in the algorithmic layer.
 
-As of Session 36 (2026-03-18): 6,135+ tests passing, ~388 files (230 source + 176 tests, 6,135 tests collected, ~56,000 lines of test code), 0 regressions. LLM-agnostic. Runs on consumer hardware.
+As of Session 36 (2026-03-18): 6,135+ tests passing, 370 source files + 176 test files, 6,135 tests collected, ~56,000 lines of test code), 0 regressions. LLM-agnostic. Runs on consumer hardware.
 
 ---
 
