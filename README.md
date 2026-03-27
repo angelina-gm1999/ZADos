@@ -161,7 +161,7 @@ TECH STACK
 
   Language:         Python 3.13
   LLM Integration:  Ollama (local) / Claude API
-  Testing:          pytest — 6,015 tests passing
+  Testing:          pytest — 6,135+ tests passing
   Dependencies:     NumPy (SDE integration), standard library otherwise
   No ML training:   All cognitive engines are algorithmic, not learned.
                     The LLM is used for natural language generation only.
