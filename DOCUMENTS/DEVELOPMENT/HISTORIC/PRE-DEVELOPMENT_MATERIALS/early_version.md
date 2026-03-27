@@ -796,5 +796,3 @@ llm_output = llm_translate(top_pick)
 print("--- SEMANTIC ANALYSIS ---")
 print("Top association:", top_pick)
 print("Generated symbolic insight:", llm_output)
-
-hold answer til im ready in voice chat pls
