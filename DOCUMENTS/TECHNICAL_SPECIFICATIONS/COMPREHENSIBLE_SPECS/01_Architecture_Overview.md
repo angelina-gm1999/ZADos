@@ -157,7 +157,7 @@ The Core layer orchestrates all of this. The SessionOrchestrator manages the lif
 | **LLM Passes per Turn** | 2 (internal thinking + final response) |
 | **Oscillatory Bands** | 6 (Delta, Theta, Alpha, Beta, Gamma, Sigma) with cross-frequency coupling |
 | **Reward Profiles** | 17 presets for different operational contexts |
-| **Tests** | 6,015+ passing |
+| **Tests** | 6,135+ passing |
 
 ---
 
