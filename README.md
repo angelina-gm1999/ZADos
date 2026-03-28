@@ -226,5 +226,6 @@ This project is intended for controlled research contexts where participants
 understand the distinction between simulation and experience.
 Please make sure to read the document folder contents and readme files across this project for a proper conceptual understanding.
 And thank you for your time!
-
+**For questions, review requests, or collaboration inquiries: [angelina.garcia.mv@gmail.com
+]**
 
