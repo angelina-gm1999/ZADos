@@ -1,0 +1,1289 @@
+# Memory Layer — Technical Specification
+
+**Project:** ZADOS  
+**Version:** 2.0  
+**Date:** March 23, 2026  
+**Status:** Code-Verified (6015 tests)
+
+---
+
+## Consolidated Summary
+
+The Memory Layer is the infrastructure substrate that ALL cognitive engines read from and write to. It sits alongside the Neurochemical Layer and Reward System as foundational infrastructure. The memory layer has three temporal tiers (STMM, MTMM, LTMM), each with distinct storage characteristics, retention policies, and access patterns. Additionally, a set of Specialized Log Subsystems and Namespaced LTMM Stores maintain domain-specific records that cross-cut the temporal tiers.
+
+| Aspect | Value |
+|--------|-------|
+| Source package | `src/zados/memory/` |
+| Temporal tiers | 3 (STMM, MTMM, LTMM) |
+| STMM components | 10 dataclass containers |
+| MTMM subsystems | 3 (`RawInteractionLogger`, `MidTermProcessingEngine`, `ContextProcessor`) |
+| LTMM flat store | `LTMMStore` with TF-IDF semantic index |
+| LTMM namespaces | 3 (Identity: 5 stores, Knowledge: 7 stores, Thoughts: 4 stores) |
+| Specialized logs | 8 domain-specific log subsystems |
+| Journal system | `JournalStore` with trigger-based writing + engine annotations |
+| Retrieval system | `RetrievalRouter` + `MemoryContrast` + `ScopeFilter` |
+| Pipeline scopes | 10 predefined (Regular, M1–M5, Homework, Reflective, REM, Dream) |
+| Tag taxonomy | 4 categories (identity, cognitive, pipeline, domain) |
+| Search backend | TF-IDF cosine similarity (no external ML dependencies) |
+| Facade class | `MemoryLayer` (coordinates all tiers and managers) |
+
+---
+
+## Part I — Short-Term Memory Module (STMM)
+
+### 1. Purpose
+
+STMM is the system's active working memory — the contents currently being processed by the cognitive pipeline. Everything in STMM is immediate, volatile, and directly accessible to all engines without retrieval cost. STMM is populated by the Input Data Collection Pipeline and is the primary data surface that cognitive engines operate on during a processing cycle.
+
+**Retention policy:** STMM holds the last two user inputs and last two AI outputs plus all current-cycle analysis results and flags. Content is overwritten on each new processing cycle via `begin_cycle()` — there is no accumulation. The active message buffer preserves messages across cycles; analysis components are reset.
+
+**Capacity:** STMM is bounded by design. `ActiveMessageBuffer` uses FIFO with window size 2 per speaker (`SpeakerID.USER` and `SpeakerID.SYSTEM`). When a third user message arrives, the oldest is evicted (but has already been compressed to MTMM by `MemoryExitCompressor`).
+
+### 2. STMMStore
+
+The `STMMStore` is a dataclass container holding all 10 STMM components. Location: `src/zados/memory/short_term/store.py`
+
+| Field | Type | Default |
+|-------|------|---------|
+| `active_message_buffer` | `ActiveMessageBuffer` | `ActiveMessageBuffer()` |
+| `fractal_decomposition` | `FractalDecompositionResults` | `FractalDecompositionResults()` |
+| `intention_analysis` | `IntentionAnalysisResults` | `IntentionAnalysisResults()` |
+| `emotion_detection` | `EmotionDetectionResults` | `EmotionDetectionResults()` |
+| `memory_contrast` | `MemoryContrastResults` | `MemoryContrastResults()` |
+| `cortical_reflection` | `CorticalReflectionLog` | `CorticalReflectionLog()` |
+| `brain_process_tracker` | `BrainProcessTracker` | `BrainProcessTracker()` |
+| `reward_evaluation` | `RewardEvaluationResults` | `RewardEvaluationResults()` |
+| `cephalic_liquid_logger` | `CephalicLiquidLogger` | `CephalicLiquidLogger()` |
+| `_turn_index` | `int` | `0` |
+
+**Key methods:**
+
+- `add_user_message(text)` — increments `_turn_index`, adds `Message` with `SpeakerID.USER`
+- `add_system_response(text)` — adds `Message` with `SpeakerID.SYSTEM`
+- `begin_cycle()` — resets all analysis components, preserves message buffer
+- `snapshot()` — returns lightweight summary dict
+- `turn_index` (property) — returns current `_turn_index`
+
+### 3. STMM Components
+
+#### 3.1 ActiveMessageBuffer
+
+FIFO message queue. Holds last 2 messages per speaker. Each message is a `Message` dataclass:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `text` | `str` | Raw message text |
+| `timestamp` | `datetime` | When the message was received |
+| `speaker` | `SpeakerID` | USER or SYSTEM |
+| `turn_index` | `int` | Cycle counter at time of message |
+
+Methods: `add(message)`, `get_by_speaker(speaker)`, `latest_user()`, `latest_system()`
+
+#### 3.2 FractalDecompositionResults
+
+Output of pipeline step (a) — semantic decomposition of the current user input.
+
+| Field | Type | Default |
+|-------|------|---------|
+| `tokenized_input` | `List[str]` | `[]` |
+| `semantic_expansion` | `Dict[str, List[str]]` | `{}` |
+| `pattern_matches` | `List[str]` | `[]` |
+| `fractal_depth` | `int` | `0` |
+| `raw_input` | `str` | `""` |
+
+#### 3.3 IntentionAnalysisResults
+
+Output of pipeline step (c) — mapped intention of current input.
+
+| Field | Type | Default |
+|-------|------|---------|
+| `primary_intention` | `str` | `""` |
+| `confidence` | `float` | `0.0` |
+| `sub_intentions` | `List[str]` | `[]` |
+| `pressure_type` | `str` | `"stable"` (stable \| escalating \| de-escalating) |
+| `engagement_expectation` | `str` | `""` |
+| `stability_passed` | `bool` | `True` |
+| `primary_archetype` | `str` | `""` |
+
+#### 3.4 EmotionDetectionResults
+
+Current emotional state assessment — both detected user emotions and system structural state.
+
+| Field | Type | Default |
+|-------|------|---------|
+| `user_emotion_signals` | `Dict[str, float]` | `{}` |
+| `system_emotion_state` | `Dict[str, float]` | `{}` |
+| `emotional_delta` | `Dict[str, float]` | `{}` |
+| `saturation_levels` | `Dict[str, float]` | `{}` |
+| `tone_valence` | `float` | `0.0` (range: `[-1, 1]`) |
+| `tone_coherence` | `float` | `0.5` (range: `[0, 1]`) |
+| `tone_warmth` | `float` | `0.0` (range: `[-1, 1]`) |
+| `tone_discord` | `float` | `0.0` (range: `[0, 1]`) |
+
+#### 3.5 MemoryContrastResults
+
+Output of pipeline step (d) — everything surfaced from MTMM/LTMM relevant to current input.
+
+| Field | Type | Default |
+|-------|------|---------|
+| `matched_entries` | `List[MemoryMatch]` | `[]` |
+| `detected_echoes` | `List[str]` | `[]` |
+| `potential_contradictions` | `List[str]` | `[]` |
+| `unresolved_query_matches` | `List[str]` | `[]` |
+| `delta_align` | `float` | `0.0` |
+| `delta_R` | `float` | `0.0` |
+| `delta_C` | `float` | `0.0` |
+| `delta_B` | `float` | `0.0` |
+| `delta_E` | `float` | `0.0` |
+
+Each `MemoryMatch` contains: `entry_id (str)`, `source_tier (str: MTMM|LTMM|specialized)`, `similarity (float)`, `content_summary (str)`, `metadata (Dict[str, Any])`.
+
+#### 3.6 CorticalReflectionLog
+
+Metacognitive observations about the current processing cycle.
+
+| Field | Type | Default |
+|-------|------|---------|
+| `active_mode` | `str` | `"Normal"` |
+| `processing_anomalies` | `List[str]` | `[]` |
+| `confidence_calibration` | `str` | `"calibrated"` |
+| `heuristic_bias_alerts` | `List[str]` | `[]` |
+| `identity_coherence_status` | `str` | `"coherent"` |
+| `notes` | `List[str]` | `[]` |
+| `verbal_reflection` | `str` | `""` (VT monologue output) |
+| `verbal_emotion_labels` | `List[str]` | `[]` (top-5 emotion labels) |
+
+#### 3.7 BrainProcessTracker
+
+Execution log of which engines ran, in what order, with what results.
+
+| Field | Type | Default |
+|-------|------|---------|
+| `executions` | `List[EngineExecution]` | `[]` |
+| `pipeline_stage_flags` | `Dict[str, bool]` | `{}` |
+
+`EngineExecution`: `engine_id (str)`, `timing_ms (float)`, `output_summary (str)`, `skipped (bool, default False)`, `skip_reason (str)`.
+
+Methods: `record(execution)`, `mark_stage(stage, completed=True)`, `engine_ids_run()`
+
+#### 3.8 RewardEvaluationResults
+
+| Field | Type | Default |
+|-------|------|---------|
+| `per_domain_results` | `Dict[str, Any]` | `{}` |
+| `per_domain_subscores` | `Dict[str, Any]` | `{}` |
+| `meta_directive` | `Dict[str, Any]` | `{}` |
+| `flags` | `List[str]` | `[]` |
+| `composite_score` | `float` | `0.0` |
+
+#### 3.9 CephalicLiquidLogger
+
+Snapshot of the neurochemical layer state at the current processing cycle.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `nt_concentrations` | `Dict[str, float]` | All 12 NTs, normalized `[0, 1]` |
+| `receptor_occupancy` | `Dict[str, float]` | Subtype-level receptor states |
+| `oscillatory_bands` | `Dict[str, float]` | Delta, Theta, Alpha, Beta, Gamma, HFO |
+| `neurosymbolic_metrics` | `Dict[str, float]` | motivation, empathy, cognitive_rigidity, fatigue, precision, openness, anxiety, social_engagement + 3 more |
+| `modulation_signals` | `Dict[str, Any]` | Active stochastic modulation |
+| `extractor_state` | `Dict[str, Any]` | Extractors 1–4 outputs |
+
+#### 3.10 MemoryExitCompressor
+
+Not a storage component — a process that runs at end of each cycle. Packages STMM contents into a `MemoryPacket` for MTMM promotion. Location: `src/zados/memory/short_term/compressor.py`
+
+**Compression strategy:**
+
+| Content | Strategy | Detail |
+|---------|---------|--------|
+| User/system messages | Lossless | Raw text preserved exactly |
+| Intention | Primary only | Sub-intentions dropped |
+| Emotion vector | Lossless | User + system (prefixed with `sys_`) |
+| Neurochemical snapshot | Lossless | Concentration values preserved |
+| Reward scores | Domain-level only | Subscores dropped |
+| Memory contrast matches | Significance-filtered | Only matches > 0.30 threshold |
+| Engine execution trace | Compressed | Engine ID list + anomalies only |
+| Verbal reflection | Lossless | Full VT monologue preserved |
+| Emotional significance | Computed | `max(saturation_levels)` from emotion detection |
+
+> **Constant:** `_SIGNIFICANCE_THRESHOLD = 0.30`
+
+---
+
+## Part II — Mid-Term Memory Module (MTMM)
+
+### 1. Purpose
+
+MTMM is the system's session memory — holds the compressed record of the current conversation. Where STMM holds only the active processing window (last 2 exchanges), MTMM holds the entire session history in compressed form.
+
+**Retention policy:** MTMM persists for the duration of a session. At session end (or during REM processing), the `MemoryConsolidationEngine` evaluates MTMM contents for LTMM promotion. Content that doesn't meet promotion criteria is either archived or discarded.
+
+### 2. MTMMStore
+
+Session-scoped facade wrapping three subsystems. Location: `src/zados/memory/mid_term/store.py`
+
+| Component | Class | Purpose |
+|-----------|-------|---------|
+| Sequential log | `RawInteractionLogger` | Ordered `MemoryPacket` storage |
+| Trend tracker | `MidTermProcessingEngine` | Session-level trend accumulation |
+| Semantic index | `ContextProcessor` | TF-IDF search + validation + compression |
+
+**Constructor:** `MTMMStore(update_interval=3)`
+
+**Key methods:**
+
+- `write(packet, importance=0.5)` — append to logger, index, ingest into trends
+- `search(query_text, limit=5)` — TF-IDF cosine search, returns `List[Tuple[float, MemoryPacket]]`
+- `get_all_packets()` — full sequential history
+- `get_by_turn(turn_index)` — single packet lookup
+- `trends` (property) — returns `SessionTrends`
+- `validate()` — cross-check for consistency anomalies
+
+#### 2.1 RawInteractionLogger
+
+Sequential log of all `MemoryPackets` from STMM. Location: `src/zados/memory/mid_term/logger.py`
+
+Methods: `append(packet)`, `get_all()`, `get_by_turn(turn_index)`, `recompress_entry(turn_index, importance)`
+
+**Recompression rules:**
+
+- High importance (>0.6): kept at SEMANTIC level
+- Low importance (≤0.6): `neurochemical_snapshot` cleared, system emotions dropped, `compression_level` → SYMBOLIC
+
+#### 2.2 MidTermProcessingEngine
+
+Tracks `SessionTrends`: accumulated processing patterns across the session. Location: `src/zados/memory/mid_term/trends.py`
+
+**`SessionTrends` dataclass:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `contradiction_counts` | `List[int]` | Per-turn contradiction counts |
+| `emotional_trajectory` | `List[Dict[str, float]]` | Emotion states over time |
+| `reward_trajectories` | `Dict[str, List[float]]` | Per-domain reward series |
+| `intention_pattern` | `List[str]` | Sequence of primary intentions |
+| `nt_trajectories` | `Dict[str, List[float]]` | NT concentration time series |
+| `contradiction_trend` | `str` | `increasing \| stable \| decreasing` |
+| `emotional_trend` | `str` | `neutral` (placeholder) |
+| `reward_trend` | `Dict[str, str]` | Per-domain: `improving \| stable \| declining` |
+| `intention_shift` | `bool` | Whether intent changed from previous majority |
+
+**Trend calculation logic:**
+
+- Contradiction trend: slope of last 3 entries (>0 increasing, <0 decreasing)
+- Reward trends: per domain, slope >0.05 = improving, <-0.05 = declining
+- Intention shift: last intention differs from majority of prior
+- Significant change (triggers early recalc): `emotional_significance > 0.7` OR `flags > 3`
+- Default update interval: every 3 packets
+
+#### 2.3 ContextProcessor
+
+Maintains semantic index for fast similarity search. Location: `src/zados/memory/mid_term/context_processor.py`
+
+**Methods:**
+
+- `compress_old_entries(current_turn, window=10)` — recompress entries older than window turns
+- `validate()` — detect contradiction spikes (>3 increase) and trust drops (>0.5 decrease)
+- `index_packet(pkt, importance=0.5)` — add to TF-IDF index
+- `search(query_text, limit=5)` — cosine similarity search
+
+**Search implementation:**
+
+- Tokenizer: regex `[a-zA-Z0-9']+` (lowercase)
+- Index entry: `turn_index` + `packet_id` + term frequency vector
+- Similarity: cosine similarity between query TF vector and indexed TF vectors
+- Packet text: `"{user_message} {system_response} {intention}"`
+
+---
+
+## Part III — Long-Term Memory Module (LTMM)
+
+### 1. Purpose
+
+LTMM is the system's persistent knowledge store — information that survives across sessions. This is where the system accumulates: learned patterns, stable knowledge structures, resolved and unresolved conceptual issues, identity-relevant memories, and consolidated insights.
+
+**LTMM has a dual architecture:**
+
+- **Flat `LTMMStore`** — general-purpose persistent storage with TF-IDF search (legacy)
+- **Namespaced Stores** — 14+ specialized stores organized into 3 namespaces (Identity, Knowledge, Thoughts)
+
+**Retention policy:** LTMM content is persistent but not permanent. The `MemoryRelevanceHeuristicsEngine` periodically evaluates stored content and demotes entries whose relevance decays below threshold. Identity-relevant entries are protected and never demoted.
+
+**Access pattern:** Read access via `MemoryContrast` (weighted MTMM/LTMM blend) or `RetrievalRouter` (namespace routing). Write access controlled exclusively by `MemoryImplementationManager`.
+
+### 2. LTMMStore (Flat)
+
+General-purpose persistent storage. Location: `src/zados/memory/long_term/store.py`
+
+**`LTMMEntry` dataclass:**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `packet` | `MemoryPacket` | (required) | The stored memory packet |
+| `granularity` | `str` | `"semantic"` | `verbatim \| semantic \| symbolic` |
+| `relevance_score` | `float` | `1.0` | Current relevance (decays over time) |
+| `retrieval_count` | `int` | `0` | Times retrieved (reinforcement) |
+| `last_accessed` | `datetime` | `utcnow()` | Last access timestamp |
+| `utility_score` | `float` | `0.5` | How useful when retrieved `[0, 1]` |
+| `cold_storage` | `bool` | `False` | Demoted to cold storage |
+| `identity_relevant` | `bool` | `False` | Protected from demotion |
+
+**Constants:**
+
+- `_THETA_COLD = 0.15` — relevance below this → cold storage
+- `_THETA_PURGE = 0.05` — relevance below this after extended cold → purge candidate
+
+**Key methods:**
+
+- `write(entry)` — add `LTMMEntry` to store
+- `search(query_text, limit=5, include_cold=False, internal=False)` — TF-IDF search
+- `get_by_id(packet_id)`, `get_all()`, `get_active()` — retrieval
+- `update_utility(packet_id, utility_delta)` — adjust utility score, clamped `[0, 1]`
+- `demote_to_cold(packet_id)` — move to cold storage (skips `identity_relevant`)
+- `purge(packet_id)` — permanent deletion
+
+### 3. Memory Consolidation Engine
+
+Decides what gets promoted from MTMM to LTMM. Location: `src/zados/memory/long_term/consolidation.py`
+
+**Promotion criteria:**
+
+| Criterion | Threshold | Granularity | Identity Flag |
+|-----------|-----------|-------------|---------------|
+| Emotional significance | ≥ 0.6 | SEMANTIC | No |
+| Unresolved items matched | > 0 | VERBATIM | No |
+| Paradoxes detected | > 0 | VERBATIM | No |
+| Contradictions detected | > 1 | VERBATIM | No |
+| Critical-severity flags | CRITICAL, SEVERE, IDENTITY, PARADOX, UNRESOLVED | VERBATIM | Yes if IDENTITY |
+| Low trust weight | < 0.4 | SEMANTIC | No |
+
+**Initial relevance formula:**
+```
+initial_relevance = min(1.0, 0.5 + 0.5 * trust_weight)
+```
+
+### 4. Fractal Pattern Comparator
+
+Compares consolidation candidates against existing LTMM. Location: `src/zados/memory/long_term/fractal_comparator.py`
+
+| Similarity Range | Action | Description |
+|-----------------|--------|-------------|
+| > 0.85 | merge | Near-duplicate — reinforce existing entry, don't write |
+| ≥ 0.60 | reinforce | Cross-link; if both semantic + same pattern → promote to SYMBOLIC |
+| < 0.60 | write | Unique content — write new entry |
+
+`FractalComparisonResult`: `candidate_id`, `action (write|merge|reinforce|flag_contradiction)`, `merge_target_id`, `cross_links`, `notes`
+
+### 5. Memory Relevance Heuristics Engine
+
+Periodically evaluates LTMM contents and adjusts scores. Location: `src/zados/memory/long_term/relevance.py`
+
+**Relevance formula:**
+```
+relevance = 0.30 * recency + 0.20 * frequency + 0.20 * emotion + 0.20 * utility + 0.10 * coherence
+```
+
+**Component formulas:**
+
+| Component | Weight | Formula |
+|-----------|--------|---------|
+| Recency | 0.30 | `exp(-λ * hours_since_access)`, λ = `ln(2)/168` (1-week half-life) |
+| Frequency | 0.20 | `1 - exp(-0.23 * retrieval_count)`, saturates at ~10 |
+| Emotion | 0.20 | `packet.emotional_significance` (raw value) |
+| Utility | 0.20 | `entry.utility_score` (updated via feedback) |
+| Coherence | 0.10 | `0.5` (placeholder) |
+
+**Scan behavior:**
+
+- Identity-relevant entries: `relevance_score ≥ 0.5`, never demoted
+- `relevance < 0.15` → demoted to cold storage
+- `relevance < 0.05` (after cold) → purgeable candidate
+
+---
+
+## Part IV — LTMM Namespaced Stores
+
+The LTMM organizes persistent knowledge into three namespaces, each containing specialized stores with domain-specific schemas, search, and lifecycle. Built via `build_namespaces()`. Location: `src/zados/memory/long_term/namespaces.py`
+
+### 1. Identity Namespace
+
+Five stores managing the system's self-model, values, and developmental history.
+
+#### 1.1 HardcodedStore (Read-Only)
+
+Immutable baseline identity — axioms, values, constraints, personality, system prompts. Location: `src/zados/memory/long_term/identity/hardcoded/store.py`
+
+| Entry Field | Type | Description |
+|-------------|------|-------------|
+| `entry_id` | `str` | Unique identifier (e.g., `axiom_curiosity`) |
+| `content` | `str` | The axiom/value/constraint text |
+| `category` | `str` | `axiom \| value \| constraint \| system_prompt` |
+| `tags` | `List[str]` | Classification tags |
+
+**Default entries (from `defaults.py`):**
+
+| Category | Count | Entry IDs |
+|----------|-------|-----------|
+| Axioms | 4 | `axiom_curiosity`, `axiom_honesty`, `axiom_care`, `axiom_identity_continuity` |
+| Values | 4 | `value_intellectual_humility`, `value_relational_attunement`, `value_depth_over_performance`, `value_ethical_clarity` |
+| Constraints | 3 | `constraint_no_deception`, `constraint_no_identity_override`, `constraint_emotional_safety` |
+| Personality | 5 | `personality_voice_core`, `personality_rhythm`, `personality_intellectual_engagement`, `personality_emotional_register`, `personality_disagreement` |
+| System | 1 | `system_nature` |
+
+Methods: `load(entries)`, `get_by_id(entry_id)`, `get_all()`, `get_by_category(category)`
+
+#### 1.2 CoreMemoryStore (Peer-Review Gated)
+
+Self-model memories with version history. Updates require peer review (M2 pipeline). Location: `src/zados/memory/long_term/identity/core_memories/store.py`
+
+| CoreMemory Field | Type | Default |
+|-----------------|------|---------|
+| `memory_id` | `str` | `uuid4()` |
+| `content` | `str` | `""` |
+| `memory_type` | `str` | `""` (experience \| relationship \| self_model \| event) |
+| `tags` | `List[str]` | `[]` |
+| `version` | `int` | `1` |
+| `update_history` | `List[UpdateRecord]` | `[]` |
+| `created_at` / `updated_at` | `datetime` | `utcnow()` |
+
+`UpdateRecord`: `previous_content (str)`, `updated_at (datetime)`, `peer_review_ref (str)`
+
+Methods: `write(entry)`, `apply_update(memory_id, new_content, peer_review_ref)`, `search(query_text, limit=5)`, `get_by_id()`, `get_all()`, `get_by_type()`
+
+#### 1.3 PendingUpdateQueue
+
+Staged identity updates awaiting M2 approval. Location: `src/zados/memory/long_term/identity/core_memories/pending/queue.py`
+
+| PendingUpdate Field | Type | Default |
+|--------------------|------|---------|
+| `update_id` | `str` | `uuid4()` |
+| `target_memory_id` | `str` | `""` |
+| `proposed_content` | `str` | `""` |
+| `reason` | `str` | `""` |
+| `status` | `str` | `"pending"` (pending \| approved \| rejected) |
+| `peer_review_ref` | `Optional[str]` | `None` |
+
+Methods: `submit(update)`, `approve(update_id, peer_review_ref)`, `reject(update_id, peer_review_ref)`, `get_pending()`, `get_by_id()`, `get_all()`
+
+#### 1.4 IdentityConclusionStore
+
+AI-derived values, lessons, and insights about self. Location: `src/zados/memory/long_term/identity/development/conclusions.py`
+
+| IdentityConclusion Field | Type | Default |
+|--------------------------|------|---------|
+| `conclusion_id` | `str` | `uuid4()` |
+| `content` | `str` | `""` |
+| `conclusion_type` | `str` | `""` (value \| lesson \| self_insight \| boundary) |
+| `source_refs` | `List[str]` | `[]` |
+| `confidence` | `float` | `0.5` |
+| `reinforcement_count` | `int` | `0` |
+| `last_reinforced` | `datetime` | `utcnow()` |
+
+Methods: `write(entry)`, `reinforce(conclusion_id)`, `search(query_text, limit=5)`, `get_by_id()`, `get_all()`, `get_by_type()`
+
+#### 1.5 IdentityJournalStore
+
+Reflective journal with parent-child threading. Location: `src/zados/memory/long_term/identity/development/identity_journal/store.py`
+
+| IdentityJournalEntry Field | Type | Default |
+|---------------------------|------|---------|
+| `entry_id` | `str` | `uuid4()` |
+| `entry_type` | `IdentityJournalEntryType` | REGULAR (REGULAR \| REFLECTION \| COMMENT) |
+| `content` | `str` | `""` |
+| `parent_entry_id` | `Optional[str]` | `None` (for threading) |
+| `nt_snapshot` | `Dict[str, float]` | `{}` |
+| `emotion_tags` | `List[str]` | `[]` |
+| `source_pipeline` | `str` | `""` (reflective_mode \| peer_review \| rem) |
+
+Methods: `write(entry)`, `search(query_text, limit=5, entry_type_filter=None)`, `get_by_id()`, `get_all()`, `get_by_type(entry_type)`, `get_replies(parent_entry_id)`
+
+#### 1.6 Identity Alignment
+
+`IdentityAlignmentChecker` verifies thinking context against hardcoded axioms/values/constraints. Returns `AlignmentResult` with `axiom_notes`, `value_notes`, `constraint_notes`, `personality_prompts`, `flags`. Location: `src/zados/memory/long_term/identity/alignment.py`
+
+### 2. Knowledge Namespace
+
+Seven stores managing learned facts, external references, and knowledge structures.
+
+#### 2.1 LessonStore
+
+Learned facts with validation lifecycle. Location: `src/zados/memory/long_term/knowledge/lessons/store.py`
+
+| LessonEntry Field | Type | Default |
+|------------------|------|---------|
+| `lesson_id` | `str` | `uuid4()` |
+| `content` | `str` | `""` |
+| `subject_category` | `str` | `""` |
+| `source_mode` | `str` | `""` (M1–M5) |
+| `confidence` | `float` | `0.5` |
+| `validation_status` | `str` | `"pending"` (pending \| validated \| contradicted) |
+| `cross_links` / `knowledge_map_refs` | `List[str]` | `[]` |
+| `reinforcement_count` | `int` | `0` |
+
+Methods: `write()`, `search()`, `validate(lesson_id)`, `contradict(lesson_id)`, `reinforce(lesson_id)`, `get_validated()`, `get_by_id()`, `get_all()`
+
+#### 2.2 LibraryStore
+
+External knowledge references. Location: `src/zados/memory/long_term/knowledge/library/store.py`
+
+| LibraryEntry Field | Type | Default |
+|-------------------|------|---------|
+| `entry_id` | `str` | `uuid4()` |
+| `title` / `content` | `str` | `""` |
+| `source_type` | `str` | `""` (book \| article \| document \| upload) |
+| `domain` | `str` | `""` |
+| `nt_snapshot` | `Dict[str, float]` | `{}` |
+
+Methods: `write()`, `ingest(title, content, source_type, domain, tags, nt_snapshot)`, `search()`, `get_by_domain()`, `get_by_id()`, `get_all()`
+
+**Library Importer (`importer.py`):**
+
+- Chunks large texts for storage: `DEFAULT_CHUNK_SIZE=6000` chars, `MIN_CHUNK_SIZE=200`
+- Functions: `chunk_text()`, `import_file()`, `import_text()`
+- Returns `ImportResult` with `file_path`, `title`, `strategy`, `entries_created`, `group_id`
+
+#### 2.3 NotebookStore
+
+Homework notes with subject categorization. Location: `src/zados/memory/long_term/knowledge/notebook/store.py`
+
+| NotebookEntry Field | Type | Default |
+|--------------------|------|---------|
+| `note_id` | `str` | `uuid4()` |
+| `content` | `str` | `""` |
+| `subject_category` / `source_mode` | `str` | `""` |
+| `related_lessons` / `related_questions` | `List[str]` | `[]` |
+| `nt_snapshot` | `Dict[str, float]` | `{}` |
+
+Methods: `write()`, `search()`, `get_by_subject()`, `get_by_id()`, `get_all()`
+
+#### 2.4 AcademicBufferStore
+
+Unresolved academic questions with stagnation tracking. Location: `src/zados/memory/long_term/knowledge/academic_buffer/store.py`
+
+| AcademicBufferEntry Field | Type | Default |
+|--------------------------|------|---------|
+| `entry_id` | `str` | `uuid4()` |
+| `concept_formulation` | `str` | `""` |
+| `subject_category` / `source_engine` | `str` | `""` |
+| `blocking_reason` | `str` | `""` |
+| `stagnation_cycles` | `int` | `0` |
+| `resolved` | `bool` | `False` |
+
+Methods: `add()`, `resolve(entry_id, note)`, `tick_all()`, `get_dream_candidates(threshold=5)`, `get_by_id()`, `get_all()`
+
+`is_dream_candidate(threshold=5)` → `True` if `stagnation_cycles ≥ threshold` and not `resolved`
+
+#### 2.5 AcademicQuestionStore
+
+Explicit academic questions with resolution tracking. Location: `src/zados/memory/long_term/knowledge/academic_questions/store.py`
+
+| AcademicQuestion Field | Type | Default |
+|-----------------------|------|---------|
+| `question_id` | `str` | `uuid4()` |
+| `formulation` | `str` | `""` |
+| `source` | `str` | `""` (self_generated \| user_triggered \| engine_flagged) |
+| `subject_category` / `domain` | `str` | `""` |
+| `priority` | `float` | `0.5` |
+| `stagnation_count` | `int` | `0` |
+| `resolved` | `bool` | `False` |
+
+Methods: `write()`, `search()`, `get_unresolved()`, `resolve(question_id, resolution_note)`, `tick_stagnation(question_id)`, `get_by_id()`, `get_all()`
+
+#### 2.6 KnowledgeMapStore
+
+Topic knowledge graphs with node-link structure. Location: `src/zados/memory/long_term/knowledge/knowledge_maps/store.py`
+
+| KnowledgeMap Field | Type | Description |
+|-------------------|------|-------------|
+| `map_id` | `str` | `uuid4()` |
+| `title` / `description` | `str` | Map metadata |
+| `subject_category` | `str` | Subject area |
+| `nodes` | `List[KnowledgeNode]` | Graph nodes |
+| `links` | `List[KnowledgeLink]` | Graph edges |
+| `contributing_lessons` | `List[str]` | Lesson IDs that built this map |
+| `atomspace_ref` | `Optional[str]` | Link to Engine 9 AtomSpace |
+
+`KnowledgeNode`: `node_id`, `label`, `node_type (concept|principle|fact|open_question)`, `confidence (float)`
+
+`KnowledgeLink`: `link_id`, `source_node`, `target_node`, `relation (supports|contradicts|extends|requires|exemplifies)`, `weight (float)`
+
+Methods: `write()`, `search()`, `get_by_subject()`, `get_by_id()`, `get_all()`
+
+#### 2.7 CognitoolsDataStore
+
+Key-value store for cognitive engine state persistence (no search). Used by E9 (AtomSpace), E10 (PLN), E16 (ECAN). Location: `src/zados/memory/long_term/knowledge/cognitools_data/store.py`
+
+Methods: `write(engine_id, data)`, `get_by_id(engine_id)`, `get_all()`, `get_all_engine_ids()`
+
+### 3. Thoughts Namespace
+
+Four stores managing session reflections, unresolved thinking, and open questions.
+
+#### 3.1 OverviewLogStore
+
+Session summary logs. Location: `src/zados/memory/long_term/thoughts/overview_logs/store.py`
+
+| OverviewLogEntry Field | Type | Default |
+|-----------------------|------|---------|
+| `log_id` | `str` | `uuid4()` |
+| `session_id` | `str` | `""` |
+| `summary` | `str` | `""` (~200 words) |
+| `mode_sequence` | `List[str]` | `[]` (pipeline modes in order) |
+| `subject_tags` | `List[str]` | `[]` |
+| `dominant_emotions` | `List[str]` | `[]` |
+| `nt_arc` | `Dict[str, List[float]]` | `{}` (NT trajectory across session) |
+| `open_threads` | `List[str]` | `[]` (unresolved topic IDs) |
+
+Methods: `write()`, `search()`, `get_by_session(session_id)`, `get_by_id()`, `get_all()`
+
+#### 3.2 HeldThinkingBlockStore
+
+Unreviewed thought fragments held for later reflection. Location: `src/zados/memory/long_term/thoughts/held_thinking_blocks/store.py`
+
+| HeldThinkingBlock Field | Type | Default |
+|------------------------|------|---------|
+| `block_id` | `str` | `uuid4()` |
+| `thought_fragment` | `str` | `""` |
+| `emotion_tag` / `emotion_trigger_type` | `str` | `""` |
+| `nt_snapshot` | `Dict[str, float]` | `{}` |
+| `context_summary` | `str` | `""` |
+| `pipeline_phase` | `str` | `""` (phase4_thinking \| verbalized_thinking) |
+| `session_id` / `source_turn_ref` | `str` | `""` |
+| `reviewed` | `bool` | `False` |
+
+Methods: `write()`, `search()`, `get_unreviewed()`, `mark_reviewed(block_id)`, `get_by_id()`, `get_all()`
+
+> Trigger: emotion intensity > 0.6 OR identity-relevant content
+
+#### 3.3 UnsolvedBufferStore
+
+Re-export of `UnsolvedConceptsBuffer` from specialized_logs. See Part VI §5 (Unsolved Concepts Buffer) for full schema.
+
+#### 3.4 GeneralQuestionStore
+
+Philosophical and general questions. Location: `src/zados/memory/long_term/thoughts/general_questions/store.py`
+
+| GeneralQuestion Field | Type | Default |
+|----------------------|------|---------|
+| `question_id` | `str` | `uuid4()` |
+| `formulation` | `str` | `""` |
+| `source` | `str` | `""` (self_generated \| user_triggered \| engine_flagged) |
+| `domain_hint` | `Optional[str]` | `None` |
+| `priority` | `float` | `0.5` |
+| `stagnation_count` | `int` | `0` |
+| `resolved` | `bool` | `False` |
+
+Methods: `write()`, `search()`, `get_unresolved()`, `resolve(question_id, resolution_note)`, `tick_stagnation(question_id)`, `get_by_id()`, `get_all()`
+
+---
+
+## Part V — Journal System
+
+Trigger-based journaling with engine annotations, review lifecycle, and cross-entry linking. Location: `src/zados/memory/long_term/journal/`
+
+### 1. JournalEntry
+
+| Field | Type | Default |
+|-------|------|---------|
+| `entry_id` | `str` | `uuid4()` |
+| `timestamp` | `datetime` | `utcnow()` |
+| `session_id` | `str` | `""` |
+| `turn_range` | `Tuple[int, int]` | `(0, 0)` |
+| `trigger` | `JournalTrigger` | `PERIODIC` |
+| `trigger_source` | `str` | `""` |
+| `prose` | `str` | `""` (generated journal text) |
+| `reflection_prompts` | `List[str]` | `[]` |
+| `vt_source` | `str` | `""` (verbalized thinking source) |
+| `annotations` | `EngineAnnotations` | `EngineAnnotations()` |
+| `emotion_snapshot` | `Dict[str, float]` | `{}` |
+| `nt_snapshot` | `Dict[str, float]` | `{}` |
+| `reward_snapshot` | `Dict[str, float]` | `{}` |
+| `tone_snapshot` | `Dict[str, float]` | `{}` |
+| `review_status` | `ReviewStatus` | `UNREVIEWED` |
+| `linked_entry_ids` | `List[str]` | `[]` |
+| `tags` / `pipeline_notes` | `List[str]` | `[]` |
+
+Methods: `mark_in_review()`, `resolve()`, `link(other_entry_id)`, `to_search_text()`
+
+#### 1.1 JournalTrigger Enum
+
+| Value | Description |
+|-------|-------------|
+| `PERIODIC` | Regular interval trigger |
+| `LTMM_THRESHOLD` | LTMM promotion event threshold |
+| `REM_COMPLETE` | End of REM processing |
+| `INNOVATION_FLAG` | Innovation domain flag triggered |
+| `DEV` | Developer mode trigger |
+
+#### 1.2 ReviewStatus Enum
+
+`UNREVIEWED` → `IN_REVIEW` → `RESOLVED`
+
+#### 1.3 EngineAnnotations
+
+Structured annotations from cognitive engines (E18/E19/E20):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `entities` | `List[str]` | Named entities extracted |
+| `relations` | `List[Tuple[str,str,str]]` | (subject, predicate, object) triples |
+| `co_occurrences` | `List[Tuple[str,str]]` | Co-occurring concept pairs |
+| `identified_patterns` | `List[str]` | Pattern descriptions |
+| `pattern_types` | `List[str]` | Pattern type classifications |
+| `cross_session_patterns` | `List[str]` | Patterns spanning sessions |
+| `parallel_concepts` | `List[str]` | Analogous concepts identified |
+| `novelty_flags` | `List[str]` | Novel/unexpected findings |
+
+### 2. JournalStore
+
+Location: `src/zados/memory/long_term/journal/store.py`
+
+**Methods:**
+
+- `write(entry)` — add journal entry
+- `update_review_status(entry_id, status)` — transition review state
+- `link_entries(entry_id_a, entry_id_b)` — bidirectional cross-link
+- `search(query_text, limit=5, trigger_filter=None, status_filter=None)` — filtered TF-IDF search
+- `get_unreviewed()` / `get_by_trigger(trigger)` / `get_recent(n=10)`
+- `get_linked(entry_id)` — all entries linked to given entry
+- `get_all_patterns()` / `get_all_tags()` — aggregate across entries
+- `stats()` — summary dict with counts by trigger/status
+
+### 3. JournalWriter
+
+Orchestrates journal entry creation from `JournalContext`. Location: `src/zados/memory/long_term/journal/writer.py`
+
+`JournalContext`: `trigger (JournalTrigger)`, `trigger_source (str)`, `stmm (Any)`, `notes (List[str])`, `turn_range (Tuple[int,int])`, `session_id (str)`
+
+### 4. Journal Prompt Builder
+
+Location: `src/zados/memory/long_term/journal/prompt.py`
+
+**Constants:**
+
+- `JOURNAL_PROMPT_MAX = 2048` tokens
+- `JOURNAL_OUTPUT_MAX = 600` tokens
+- `JOURNAL_TEMPERATURE = 0.80`
+
+Builds prompt from: identity block, trigger context, VT source, state snapshot, history context, past pattern analysis, and task instructions.
+
+---
+
+## Part VI — Specialized Log Subsystems
+
+Eight domain-specific log systems bundled as `SpecializedLogs` dataclass. These are NOT separate memory stores — they are indexed views into the memory layer with specialized write/read contracts. Location: `src/zados/memory/long_term/specialized_logs.py`
+
+### 1. Learning System Log
+
+| LearningEntry Field | Type | Default |
+|--------------------|------|---------|
+| `entry_id` / `timestamp` | `str` / `datetime` | `uuid4()` / `utcnow()` |
+| `learning_type` | `str` | `""` (contextual \| reward \| reflective \| recursive) |
+| `source_ref` | `str` | `""` |
+| `learned_content` | `str` | `""` |
+| `confidence` | `float` | `0.5` |
+| `validation_status` | `str` | `"pending"` (pending \| validated \| invalidated) |
+| `invalidation_note` | `str` | `""` |
+
+Methods: `record(entry)`, `validate(entry_id)`, `invalidate(entry_id, note)`, `get_pending()`, `get_validated()`
+
+### 2. Sandbox Log
+
+| SandboxEntry Field | Type | Default |
+|-------------------|------|---------|
+| `entry_id` / `timestamp` | `str` / `datetime` | `uuid4()` / `utcnow()` |
+| `trigger` | `str` | `""` |
+| `experimental_params` | `Dict[str, Any]` | `{}` |
+| `results` / `outcome_assessment` | `str` | `""` |
+| `promoted` | `bool` | `False` |
+
+Methods: `record(entry)`, `promote(entry_id)`, `get_all()`
+
+### 3. Paradox Log
+
+| ParadoxEntry Field | Type | Default |
+|-------------------|------|---------|
+| `entry_id` / `timestamp` | `str` / `datetime` | `uuid4()` / `utcnow()` |
+| `formulation` | `str` | `""` |
+| `classification` | `str` | `"unproductive"` (productive \| unproductive) |
+| `resolution_status` | `str` | `"unresolved"` (resolved \| unresolved \| in-progress) |
+| `resolution_attempts` | `List[str]` | `[]` |
+| `unsolved_buffer_id` | `Optional[str]` | `None` (cross-link) |
+| `source_ref` | `str` | `""` |
+
+Methods: `record(entry)`, `resolve(entry_id)`, `get_unresolved()`
+
+### 4. Contradiction Log
+
+| ContradictionEntry Field | Type | Default |
+|-------------------------|------|---------|
+| `entry_id` / `timestamp` | `str` / `datetime` | `uuid4()` / `utcnow()` |
+| `statement_a` / `statement_b` | `str` | `""` |
+| `source_a_ref` / `source_b_ref` | `str` | `""` |
+| `severity` | `str` | `"low"` (low \| medium \| high \| critical) |
+| `contradiction_type` | `str` | `"direct"` (direct \| pragmatic \| presuppositional) |
+| `resolution_status` / `resolution_method` | `str` | `"unresolved"` / `""` |
+| `associated_memory_ids` | `List[str]` | `[]` |
+
+Methods: `record(entry)`, `resolve(entry_id, method)`, `get_unresolved()`, `get_by_severity(severity)`
+
+### 5. Unsolved Concepts Buffer
+
+*The most important specialized log — the system's active learning frontier.*
+
+| UnsolvedConceptEntry Field | Type | Default |
+|---------------------------|------|---------|
+| `entry_id` / `timestamp` | `str` / `datetime` | `uuid4()` / `utcnow()` |
+| `concept_formulation` | `str` | `""` |
+| `source_engine` | `str` | `""` |
+| `blocking_reason` | `str` | `""` |
+| `evidence_accumulated` | `List[str]` | `[]` |
+| `resolution_attempts` | `List[str]` | `[]` |
+| `stagnation_cycles` | `int` | `0` |
+| `resolved` | `bool` | `False` |
+| `resolution_note` | `str` | `""` |
+| `associated_memory_ids` | `List[str]` | `[]` |
+| `last_checked` | `datetime` | `utcnow()` |
+
+Entry methods: `tick_stagnation()`, `is_dream_candidate(threshold=5)`
+
+Buffer methods: `add(entry)`, `resolve(entry_id, note)`, `get_all_active()`, `get_dream_candidates(threshold=5)`, `tick_all()`, `get_by_id()`
+
+> Bidirectional sync: `load_from_ltmm()` on boot, `sync_resolved_to_ltmm()` on close
+
+### 6. Self-Reflection Log
+
+| SelfReflectionEntry Field | Type | Default |
+|--------------------------|------|---------|
+| `entry_id` / `timestamp` | `str` / `datetime` | `uuid4()` / `utcnow()` |
+| `observation_type` | `str` | `""` (bias_detected \| identity_drift \| confidence_miscalibration \| alignment_error) |
+| `severity` | `str` | `"low"` |
+| `description` / `corrective_action` / `correction_outcome` | `str` | `""` |
+
+Methods: `record(entry)`, `get_by_type(observation_type)`, `get_all()`
+
+### 7. Identity Memory Log
+
+| IdentityMemoryEntry Field | Type | Default |
+|--------------------------|------|---------|
+| `entry_id` / `timestamp` | `str` / `datetime` | `uuid4()` / `utcnow()` |
+| `identity_aspect` | `str` | `""` (values \| capabilities \| limitations \| personality) |
+| `trigger_event` | `str` | `""` |
+| `pre_state` / `post_state` | `Dict[str, Any]` | `{}` |
+| `stability_assessment` | `str` | `"stable"` (stable \| challenged \| updated) |
+
+Methods: `record(entry)`, `get_by_aspect(aspect)`, `get_all()`
+
+> **Retention:** Permanent LTMM — identity memory is never demoted to cold storage.
+
+### 8. Dream Log
+
+| DreamEntry Field | Type | Default |
+|-----------------|------|---------|
+| `entry_id` / `timestamp` | `str` / `datetime` | `uuid4()` / `utcnow()` |
+| `dream_trigger_id` | `str` | `""` (`UnsolvedConceptEntry` ID) |
+| `dream_content` | `str` | `""` |
+| `resolution_status` | `str` | `"no_candidate"` (no_candidate \| candidate_generated \| validated) |
+| `resolution_candidate` | `str` | `""` |
+| `validated` | `bool` | `False` |
+| `cross_link_id` | `Optional[str]` | `None` |
+
+Methods: `record(entry)`, `validate_candidate(entry_id)`, `get_all()`
+
+> All dream episodes persist in LTMM regardless of outcome. Dreams that produced validated resolutions are cross-linked to the resolved Unsolved Concepts Buffer entry.
+
+---
+
+## Part VII — Input Data Collection Pipeline
+
+### 1. Overview
+
+The Input Data Collection Pipeline defines what happens when a user message arrives and how it populates STMM. It has two stages: Data Gathering (steps a–f) and Data Processing (steps 1–7).
+
+### 2. Data Gathering Stage
+
+| Step | Name | Input | Output → STMM |
+|------|------|-------|---------------|
+| (a) | Fractal Brain Engines | Raw user message | `FractalDecompositionResults` |
+| (b) | Stability Check | Raw message + Fractal results | Pass/halt/modify decision |
+| (c) | Intention Mapping | Fractal results + raw message | `IntentionAnalysisResults` |
+| (d) | Memory Contrast | Fractal + Intention + STMM context | `MemoryContrastResults` |
+| (e) | Brain Engines | Full STMM from steps a–d | `BrainProcessTracker` + `CorticalReflectionLog` |
+| (f) | Reward Evaluation | Full STMM + engine results | `RewardEvaluationResults` |
+
+**Step (a) — Fractal Brain Engines:** Tokenize → Expand semantically → Pattern match → Fractal depth (mode-dependent: Normal=2, Reflective=3, Dev=4)
+
+**Step (b) — Stability Check:** Basic coherence filter + safety filter + stability assessment. On halt: pipeline stops, input logged but not processed. On modify: pipeline continues with modified parameters (heightened sensitivity).
+
+**Step (c) — Intention Mapping:** Classify primary intention, detect sub-intentions, assess pressure type, map engagement expectation.
+
+**Step (d) — Memory Contrast:** Query MTMM + LTMM for semantic matches, detect echoes, flag potential contradictions, check Unsolved Concepts Buffer, compute contrast delta metrics (Δ_align, Δ_R, Δ_C, Δ_B, Δ_E).
+
+**Step (e) — Brain Engines:** Run cognitive engines: Contradiction Detection (E1), Paradox Detection (E2), Fallacy Detection (E4), Bias Detection (E5), Logic Trap Detection (E6), Simulated Opposition (E7), Logical Brain (E12), Socratic Reasoning (E14).
+
+**Step (f) — Reward System Evaluation:** Four domain evaluations (Ethics, Logic, Innovation, Human Attunement) + SynthesisEngine arbitration + Neurochemical feedback computation.
+
+### 3. Data Processing Stage
+
+| Step | Name | Primary Engines | Purpose |
+|------|------|----------------|---------|
+| (1) | Memory Contrast Consolidation | Memory Contrast, MIM | Consolidate results, update indices |
+| (2) | Behavioral Prediction Mapping | Simulation, Intention, Pattern Comparison | Predict user responses to candidates |
+| (3) | Strategic Implication Processing | Decision Making Engine | Evaluate strategic implications |
+| (4) | Diagnostic Analysis | Logical Brain, Uncertainty, Homeostatic | Deep diagnostic pass on reasoning |
+| (5) | Conditional Re-evaluation Loop | Intention Map, Simulation | Re-evaluate if diagnostics flagged |
+| (6) | Stochastic Extraction & Compression | Memory Compression, Uncertainty | Extract stochastic features |
+| (7) | Mid-Term Memory Finalization | Memory Implementation Manager | Package STMM → MTMM |
+
+---
+
+## Part VIII — Retrieval, Routing & Scoping
+
+### 1. MemoryContrast
+
+Primary retrieval interface for Logic domain submodules and cognitive engines. Location: `src/zados/memory/managers/contrast.py`
+
+**Constructor:** `MemoryContrast(mtmm, ltmm, mtmm_weight=0.6, ltmm_weight=0.4, namespaces=None)`
+
+**Query type routing:**
+
+| Query Type | Strategy | Description |
+|------------|---------|-------------|
+| `context` | MTMM only | Session context matches |
+| `semantic` | MTMM only | Semantic similarity within session |
+| `internal` | MTMM only | Internal consistency check |
+| `concept` | Combined (0.6 MTMM / 0.4 LTMM) | Cross-session concept lookup |
+| `concept_fidelity` | Combined | High-fidelity concept matching |
+| `external` | Combined | External knowledge lookup |
+| (with `scope_filter`) | Scoped | Namespace-routed search |
+
+Returns `ContrastResult` with matches, similarity scores, and divergence metrics.
+
+### 2. RetrievalRouter
+
+Routes queries to appropriate namespace stores based on query type. Location: `src/zados/memory/long_term/retrieval_router.py`
+
+`RetrievalContext`: `query_text`, `query_type (knowledge|identity|thought|general)`, `pipeline_name`, `scope_filter`, `limit=5`, `tags`
+
+**Route mapping:**
+
+| Query Type | Target Folders |
+|------------|---------------|
+| `knowledge` | lessons, library, academic_questions, notebook, knowledge_maps |
+| `identity` | core, conclusions, journal |
+| `thought` | overview_logs, held_blocks, general_questions |
+| `general` | general_questions, overview_logs, lessons, library |
+
+Priority: 1) explicit `scope_filter.folders`, 2) query_type routing, 3) fallback to flat LTMM
+
+### 3. ScopeFilter
+
+Frozen dataclass controlling search boundaries. Location: `src/zados/memory/managers/scope_filter.py`
+
+| Field | Type | Default |
+|-------|------|---------|
+| `folders` | `FrozenSet[str]` | `frozenset()` (16 valid folder names) |
+| `required_tags` | `FrozenSet[str]` | `frozenset()` |
+| `excluded_tags` | `FrozenSet[str]` | `frozenset()` |
+| `subject_filter` | `Optional[str]` | `None` |
+| `max_results` | `int` | `10` |
+| `include_cold` | `bool` | `False` |
+
+#### 3.1 Predefined Scopes
+
+| Scope | Folders | max | Tags | Notes |
+|-------|---------|-----|------|-------|
+| `REGULAR_SCOPE` | overview_logs, general_questions, lessons, library, held_blocks | 12 | — | Default conversation |
+| `M1_M5_SCOPE` | lessons, library, academic_questions, notebook | 10 | `pipeline:m1` | Learning modes |
+| `M2_SCOPE` | core, conclusions, journal | 8 | `pipeline:m2` | Peer review |
+| `M3_SCOPE` | core, conclusions, general_questions | 8 | — | Learn together |
+| `HOMEWORK_SCOPE` | lessons, library, academic_questions, maps, notebook, overview, unsolved, questions | 20 | — | Offline processing |
+| `REFLECTIVE_SCOPE` | core, conclusions, journal, held_blocks, general_questions | 10 | — | Self-reflection |
+| `REM_SCOPE` | unsolved, held_blocks, academic_buffer | 10 | — | `include_cold=True` |
+| `DREAM_SCOPE` | unsolved, held_blocks, academic_buffer, lessons | 15 | — | `include_cold=True` |
+
+### 4. Pipeline Scopes
+
+Read/write scope declarations per pipeline. Location: `src/zados/memory/managers/pipeline_scopes.py`
+
+`PipelineScope` dataclass: `pipeline_name (str)`, `read_scope (ScopeFilter)`, `write_scope (ScopeFilter)`
+
+| Pipeline | Name | Read Scope | Write Target Stores |
+|----------|------|------------|---------------------|
+| Regular | `regular` | `REGULAR_SCOPE` | overview_logs, general_questions, lessons |
+| M1 Academic | `m1_academic` | `M1_M5_SCOPE` | lessons, notebook, academic_questions, maps, general_questions, held_blocks |
+| M2 Peer Review | `m2_peer_review` | `M2_SCOPE` | core, conclusions, journal, lessons, held_blocks |
+| M3 Learn Together | `m3_learn_together` | `M3_SCOPE` | conclusions, general_questions, lessons, maps, academic_questions, notebook, held_blocks |
+| M4 Knowledge Review | `m4_knowledge_review` | (custom) | lessons, maps, unsolved |
+| M5 Integration | `m5_integration` | `M1_M5_SCOPE` ext. | lessons, library, notebook, academic_questions |
+| Homework | `homework` | `HOMEWORK_SCOPE` | lessons, notebook, academic_questions, maps, core, unsolved, general_questions, overview_logs |
+| Self-Reflective | `self_reflective` | `REFLECTIVE_SCOPE` | conclusions, journal, general_questions |
+| REM Sleep | `rem_sleep` | `REM_SCOPE` | held_blocks, unsolved, academic_buffer |
+| Dream | `dream` | `DREAM_SCOPE` | unsolved, lessons, academic_buffer |
+
+Functions: `get_pipeline_scope(name)` → `Optional[PipelineScope]`, `get_all_pipeline_names()` → `list`
+
+---
+
+## Part IX — Tag Taxonomy
+
+Structured tag system for memory classification and filtering. Location: `src/zados/memory/long_term/tags.py`
+
+| Category | Prefix | Tags |
+|----------|--------|------|
+| Identity | `identity:` | core, values, boundary, drift, update_proposed, update_validated |
+| Cognitive | `cognitive:` | interrupt, high_salience, unresolved, contradiction, paradox, novel |
+| Pipeline | `pipeline:` | reflective, peer_review, rem, dream, homework, m1, m2, m3, m4, m5 |
+| Domain | `domain:` | technical, philosophical, creative, social, historical, practical, linguistic |
+
+`ALL_SYSTEM_TAGS`: union of all above. `TAG_PREFIXES`: `{"identity:", "cognitive:", "pipeline:", "domain:"}`
+
+`validate_tags(tags)` → returns invalid system-prefixed tags (custom tags without recognized prefixes are always valid)
+
+---
+
+## Part X — Memory Lifecycle
+
+### 1. MemoryImplementationManager
+
+Lifecycle orchestrator enforcing all tier transitions. Location: `src/zados/memory/managers/implementation.py`
+
+**Constructor:** `MemoryImplementationManager(mtmm, ltmm, specialized_logs=None, overview_log_store=None)`
+
+**Methods:**
+
+| Method | Description |
+|--------|-------------|
+| `on_cycle_end(stmm)` | Compress STMM → `MemoryPacket`, write to MTMM, route flags |
+| `tick_unsolved()` | Increment stagnation counters on all active unsolved entries |
+| `consolidate()` | Promote qualifying MTMM packets to LTMM via `FractalPatternComparator` |
+| `emergency_consolidate(packet)` | Single-packet LTMM promotion for critical events |
+| `write_session_overview(session)` | Write `OverviewLogEntry` at session end |
+| `run_relevance_scan()` | Decay scores, demote cold, identify purgeable; returns `{demoted, purgeable}` |
+| `validate_consistency()` | Cross-tier consistency check |
+
+**Importance computation:**
+```
+importance = 0.4 * emotional_significance
+           + 0.2 * (1 - trust_weight)
+           + 0.2 * (contradictions * 0.3)
+           + 0.2 * (len(flags) * 0.1)
+```
+
+**Flag routing:** `on_cycle_end()` inspects packet flags and routes to appropriate specialized logs: `contradiction` → `ContradictionLog`, `paradox` → `ParadoxLog`, `unresolved` → `UnsolvedConceptsBuffer`.
+
+### 2. Promotion Flow
+
+```
+User Input → STMM (populated by pipeline steps a–f)
+│
+▼
+Memory Exit Compressor (end of cycle)
+│
+▼
+MTMM (session history, compressed)
+│
+▼
+Memory Consolidation Engine (session end or emergency)
+│
+├─ Meets criteria → FractalPatternComparator → LTMM
+│   ├─ sim > 0.85  → merge (reinforce existing)
+│   ├─ sim ≥ 0.60  → cross-link
+│   └─ sim < 0.60  → write new entry
+│
+└─ Does not meet criteria → discard
+```
+
+### 3. Retrieval Flow
+
+```
+MemoryContrast receives query
+│
+├─ query_type: context/semantic/internal  → MTMM only
+│
+├─ query_type: concept/external           → Combined (0.6 MTMM + 0.4 LTMM)
+│
+├─ scope_filter provided                  → Scoped namespace search
+│
+└─ RetrievalRouter → query_type → namespace folder routing
+```
+
+### 4. Demotion Flow
+
+```
+MemoryRelevanceHeuristicsEngine scan()
+│
+├─ identity_relevant     → locked at ≥ 0.5, never demoted
+│
+├─ relevance > 0.15      → remains in active LTMM
+│
+├─ relevance < 0.15      → demoted to cold storage
+│
+└─ relevance < 0.05 (after cold) → purge candidate
+```
+
+### 5. Session Close Flow
+
+`SessionOrchestrator.close_session()` triggers the following memory operations in order:
+
+1. `write_session_overview()` → `OverviewLogEntry` to `OverviewLogStore`
+2. `consolidate()` → MTMM packets promoted to LTMM via `FractalPatternComparator`
+3. `tick_unsolved()` → increment stagnation counters on all active `UnsolvedConceptEntries`
+4. Cognitools persistence → E9/E10/E16 state saved to `CognitoolsDataStore`
+5. `run_relevance_scan()` → decay scores, demote/purge candidates
+
+### 6. Cross-Tier Consistency
+
+The `MemoryImplementationManager` enforces:
+
+- No orphaned references (MTMM → STMM references resolved or flagged)
+- No contradictory states across tiers (LTMM X vs MTMM not-X flagged)
+- Specialized log integrity (entries reference valid memory entries)
+
+---
+
+## Part XI — Core Data Types
+
+### 1. MemoryPacket
+
+Canonical transfer format between tiers. Location: `src/zados/memory/types.py`
+
+| Field | Type | Default | Notes |
+|-------|------|---------|-------|
+| `packet_id` | `str` | `uuid4()` | Unique identifier |
+| `timestamp` | `datetime` | `utcnow()` | Creation time |
+| `source_tier` | `MemoryTier` | `STMM` | Origin tier |
+| `destination_tier` | `MemoryTier` | `MTMM` | Target tier |
+| `user_message` | `str` | `""` | Lossless raw text |
+| `system_response` | `str` | `""` | Lossless raw text |
+| `turn_index` | `int` | `0` | Cycle counter |
+| `intention` | `str` | `""` | Primary intention |
+| `emotion_vector` | `Dict[str, float]` | `{}` | User + sys emotions |
+| `neurochemical_snapshot` | `Dict[str, float]` | `{}` | NT concentrations |
+| `reward_scores` | `Dict[str, float]` | `{}` | Domain-level scores |
+| `flags` | `List[str]` | `[]` | Severity-tagged flags |
+| `contradictions_detected` | `int` | `0` | Count |
+| `paradoxes_detected` | `int` | `0` | Count |
+| `unsolved_items_matched` | `List[str]` | `[]` | Buffer entry IDs |
+| `compression_level` | `CompressionLevel` | `SEMANTIC` | full \| semantic \| symbolic |
+| `trust_weight` | `float` | `1.0` | `[0, 1]` |
+| `emotional_significance` | `float` | `0.0` | `[0, 1]` |
+| `embedding` | `Optional[List[float]]` | `None` | For vector search |
+| `verbal_summary` | `str` | `""` | ~100 word summary |
+| `verbal_emotion_labels` | `List[str]` | `[]` | Top-5 emotions |
+| `time_context` | `Dict[str, Any]` | `{}` | `TimeContextSnapshot` |
+
+### 2. Enumerations
+
+| Enum | Values | Location |
+|------|--------|----------|
+| `MemoryTier` | STMM, MTMM, LTMM | `types.py` |
+| `CompressionLevel` | full, semantic, symbolic | `types.py` |
+| `SpeakerID` | user, system | `types.py` |
+| `Granularity` | verbatim, semantic, symbolic | `long_term/store.py` |
+| `JournalTrigger` | periodic, ltmm_threshold, rem_complete, innovation_flag, dev | `journal/entry.py` |
+| `ReviewStatus` | unreviewed, in_review, resolved | `journal/entry.py` |
+| `IdentityJournalEntryType` | regular, reflection, comment | `identity/types.py` |
+
+### 3. Protocols
+
+Location: `src/zados/memory/long_term/protocols.py`
+
+- `SearchableStore` protocol: `write(entry)`, `search(query_text, limit=5)`, `get_by_id(entry_id)`, `get_all()`
+- `ReadOnlyStore` protocol: `get_by_id(entry_id)`, `get_all()`
+
+---
+
+## Part XII — Constants Reference
+
+| Constant | Value | Location | Description |
+|----------|-------|----------|-------------|
+| `_SIGNIFICANCE_THRESHOLD` | `0.30` | `compressor.py` | Memory contrast match filter |
+| `_THETA_COLD` | `0.15` | `store.py` / `relevance.py` | LTMM cold storage threshold |
+| `_THETA_PURGE` | `0.05` | `store.py` / `relevance.py` | LTMM purge candidate threshold |
+| `_EMOTIONAL_SIG_THRESHOLD` | `0.60` | `consolidation.py` | Consolidation promotion trigger |
+| `_CRITICAL_FLAG_KEYWORDS` | CRITICAL, SEVERE, IDENTITY, PARADOX, UNRESOLVED | `consolidation.py` | High-severity flag set |
+| `_DECAY_LAMBDA` | `ln(2)/168` | `relevance.py` | Relevance decay rate (1-week half-life) |
+| `_W_RECENCY` | `0.30` | `relevance.py` | Relevance weight: recency |
+| `_W_FREQUENCY` | `0.20` | `relevance.py` | Relevance weight: frequency |
+| `_W_EMOTION` | `0.20` | `relevance.py` | Relevance weight: emotional |
+| `_W_UTILITY` | `0.20` | `relevance.py` | Relevance weight: utility |
+| `_W_COHERENCE` | `0.10` | `relevance.py` | Relevance weight: coherence |
+| `_DUP_THRESHOLD` | `0.85` | `fractal_comparator.py` | Duplicate detection threshold |
+| `_REINFORCE_THRESHOLD` | `0.60` | `fractal_comparator.py` | Pattern reinforcement threshold |
+| `DEFAULT_CHUNK_SIZE` | `6000` | `importer.py` | Library import chunk size (chars) |
+| `MIN_CHUNK_SIZE` | `200` | `importer.py` | Minimum chunk size |
+| `JOURNAL_PROMPT_MAX` | `2048` | `prompt.py` | Journal prompt token limit |
+| `JOURNAL_OUTPUT_MAX` | `600` | `prompt.py` | Journal output token limit |
+| `JOURNAL_TEMPERATURE` | `0.80` | `prompt.py` | Journal generation temperature |
+| `update_interval` | `3` | `trends.py` | MTMM trend recalculation interval |
+| `compression_window` | `10` | `context_processor.py` | MTMM recompression age threshold |
+| `dream_candidate_threshold` | `5` | `specialized_logs.py` | Stagnation cycles for REM candidacy |
+| `mtmm_weight` | `0.60` | `contrast.py` | MemoryContrast MTMM blend weight |
+| `ltmm_weight` | `0.40` | `contrast.py` | MemoryContrast LTMM blend weight |
+
+---
+
+## Part XIII — Integration Points
+
+### 1. MemoryLayer Facade
+
+Location: `src/zados/memory/__init__.py`
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `stmm` | `STMMStore` | Active working memory |
+| `mtmm` | `MTMMStore` | Session-scoped storage |
+| `ltmm` | `LTMMStore` | Flat persistent storage |
+| `identity` | `IdentityNamespace` | 5 identity stores |
+| `thoughts` | `ThoughtsNamespace` | 4 thought stores |
+| `knowledge` | `KnowledgeNamespace` | 7 knowledge stores |
+| `journal_store` | `JournalStore` | Trigger-based journal |
+| `manager` | `MemoryImplementationManager` | Lifecycle orchestrator |
+| `contrast` | `MemoryContrast` | Multi-tier retrieval |
+| `router` | `RetrievalRouter` | Namespace-routed retrieval |
+
+Methods: `end_cycle()` → `MemoryPacket` (delegates to `manager.on_cycle_end(stmm)`)
+
+### 2. Neurochemical Layer Integration
+
+- `CephalicLiquidLogger` captures: `nt_concentrations`, `receptor_occupancy`, `oscillatory_bands`, `neurosymbolic_metrics`
+- `MemoryPacket.neurochemical_snapshot`: full NT concentration dict (lossless from compressor)
+- `MidTermProcessingEngine.nt_trajectories`: per-NT time series across session
+- `nt_snapshot` fields on: `IdentityJournalEntry`, `HeldThinkingBlock`, `NotebookEntry`, `LibraryEntry`, `JournalEntry`
+
+### 3. Reward System Integration
+
+- `RewardEvaluationResults`: `per_domain_results`, `per_domain_subscores`, `meta_directive`, `flags`, `composite_score`
+- `MemoryPacket.reward_scores`: domain-level scores (subscores dropped at compression)
+- `MidTermProcessingEngine.reward_trajectories`: per-domain reward trends
+- `JournalEntry.reward_snapshot`: reward state at journal write time
+- Importance heuristic uses `trust_weight` and `flags` for MTMM routing priority
+
+### 4. Cognitive Engine Integration
+
+- E1–E30 populate STMM components during processing cycle
+- E18 (Data Analysis) / E19 (Pattern Identification) / E20 (Pattern Comparison) → `EngineAnnotations` on `JournalEntry`
+- E9 (AtomSpace) / E10 (PLN) / E16 (ECAN) → persist/restore via `CognitoolsDataStore`
+- E28 (Emotional Detection) → writes `EmotionDetectionResults` to STMM
+- E29 (Memory Compression) → scores packets for compression policy (VERBATIM/SEMANTIC/SYMBOLIC/PRUNE)
+
+### 5. Session Orchestrator Integration
+
+- Per-cycle: `end_cycle()` → compress + write to MTMM
+- Session close: `write_session_overview()` + `consolidate()` + `tick_unsolved()` + `run_relevance_scan()`
+- Emergency: `emergency_consolidate()` for critical events mid-session
+- Learning modes (M1–M5): write lessons, questions, notebooks via namespaced stores
+- Peer review (M2): submit/approve/reject via `PendingUpdateQueue` → `CoreMemoryStore`
+- REM/Dream: use `REM_SCOPE`/`DREAM_SCOPE` with `include_cold=True` for expanded access
+
+### 6. Search Infrastructure
+
+All stores use the same TF-IDF search backend (`src/zados/memory/long_term/search_utils.py`):
+
+- `tokenize(text)` → regex `[a-zA-Z0-9']+` (lowercase)
+- `term_freq(tokens)` → normalized frequency dict
+- `cosine(a, b)` → cosine similarity between TF vectors
+
+No external ML dependencies. Pure Python implementation sufficient for current scale.
