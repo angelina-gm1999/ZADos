@@ -110,4 +110,5 @@ The copyright holder reserves the right to offer different or additional licensi
 
 ---
 
-**For questions, review requests, or collaboration inquiries: [contact information]**
+**For questions, review requests, or collaboration inquiries: [angelina.garcia.mv@gmail.com
+]**
