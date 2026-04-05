@@ -1,0 +1,25 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/Main.gd" id="1_main"]
+[ext_resource type="Script" path="res://scripts/NavBar.gd" id="2_navbar"]
+[ext_resource type="Script" path="res://scripts/StatusStrip.gd" id="3_status"]
+
+[node name="Main" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_main")
+
+[node name="UI" type="VBoxContainer" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="NavBar" type="HBoxContainer" parent="UI"]
+custom_minimum_size = Vector2(0, 48)
+script = ExtResource("2_navbar")
+
+[node name="WorkspaceContainer" type="Control" parent="UI"]
+size_flags_vertical = 3
+
+[node name="StatusStrip" type="HBoxContainer" parent="UI"]
+custom_minimum_size = Vector2(0, 22)
+script = ExtResource("3_status")
