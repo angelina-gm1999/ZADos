@@ -1,0 +1,1104 @@
+ZADOS FRONTEND SPEC -- GAP ANALYSIS & ADDENDUM
+=================================================
+Date: 2026-04-04
+Purpose: Fill every unspecced gap in ZADOS_FRONTEND_SPEC.txt so the frontend
+         can be implemented without ambiguity. Organized to merge into the
+         existing spec by section number.
+
+This document covers:
+  A. Cross-cutting gaps (affect ALL workspaces)
+  B. Per-workspace gap fills (sections 1-6)
+  C. Bridge server additions (section 7)
+  D. Godot scene structure additions (section 8)
+
+================================================================================
+
+A. CROSS-CUTTING GAPS -- NEW SECTION: INSERT AS SECTION 0.5
+================================================================================
+
+These behaviors apply globally and must be resolved before any workspace can
+be implemented correctly.
+
+--------------------------------------------------------------------------------
+A.1  STARTUP & INITIALIZATION SEQUENCE
+--------------------------------------------------------------------------------
+
+The original spec describes the running state but never describes what happens
+when the application first launches. This is the very first thing the user
+sees and it is completely unspecced.
+
+STARTUP FLOW:
+
+  1. Godot Main scene loads
+     -> Show splash / loading screen with ZADOS branding
+     -> StatusStrip and NavBar are NOT visible yet
+
+  2. ZADOSClient.gd (autoload) attempts HTTP connection to base_url
+     -> GET /health (new endpoint, see Bridge Server Additions)
+     -> Timeout: 5 seconds per attempt, 3 retries with 2s backoff
+
+  3. CONNECTION OUTCOMES:
+
+     SUCCESS -> proceed to step 4
+
+     FAILURE (server not running) ->
+       Show "Server Unavailable" screen with:
+         - Message: "ZADOS server is not running at {base_url}"
+         - "Retry" button (re-attempts connection)
+         - "Settings" button (edit base_url -- useful if port changed)
+         - Auto-retry every 10 seconds with countdown display
+       Do NOT show the workspace UI. User cannot proceed without server.
+
+     FAILURE (server running but error) ->
+       Show "Connection Error" screen with:
+         - HTTP status code and error message
+         - "Retry" button
+         - "View Logs" expandable (raw error response)
+
+  4. Server connected -> call POST /session/open
+     -> On success: store session_id, populate branch + turn_count
+     -> On failure: show "Session Creation Failed" screen with error + retry
+
+  5. Session opened -> parallel fetch initial state:
+     -> GET /session/state (full state snapshot)
+     -> GET /metrics (initial neurochem values for pulse strip)
+     -> Both must succeed before workspace loads
+
+  6. Initial state loaded ->
+     -> Populate StatusStrip (branch, turn count, mode token)
+     -> Populate NeurochemPulseStrip (initial NT levels)
+     -> Show NavBar
+     -> Load ConversationWorkspace as default
+     -> Establish WebSocket connection to /stream/process
+     -> Mark ZADOSClient.is_ready = true
+
+  7. If KnowledgeBootstrap needs to run (first launch or new seeds):
+     -> Server handles this internally on session open
+     -> POST /session/open response includes bootstrap_status field:
+        "skipped" | "running" | "complete"
+     -> If "running": show progress indicator in splash screen
+        "Loading knowledge seeds... ({n}/{total})"
+     -> Poll GET /session/bootstrap_status every 2s until "complete"
+
+SIGNAL: ZADOSClient emits `connection_ready` when step 6 completes.
+All workspace scenes wait for this signal before requesting data.
+
+--------------------------------------------------------------------------------
+A.2  ZADOSClient SINGLETON -- FULL BEHAVIORAL SPEC
+--------------------------------------------------------------------------------
+
+The original spec defines 4 signals and mentions the singleton exists.
+This section specifies its complete behavior.
+
+CLASS: ZADOSClient extends Node (autoload)
+
+PROPERTIES:
+  var base_url: String = "http://localhost:8000"
+  var session_id: String = ""
+  var is_ready: bool = false
+  var is_generating: bool = false        # true while /process or WS stream active
+  var ws_connected: bool = false
+  var last_error: Dictionary = {}
+  var current_mode: String = "Normal"
+  var generation_target_workspace: String = ""  # which workspace started the gen
+
+SIGNALS (expanded from original 4):
+  signal connection_ready()
+  signal connection_lost()
+  signal connection_restored()
+  signal turn_phase_updated(phase: int, data: Dictionary)
+  signal turn_token_streamed(token: String, phase: int)
+  signal turn_complete(result: Dictionary)
+  signal turn_error(error: Dictionary)
+  signal metrics_updated(metrics: Dictionary)
+  signal atom_delta(changed_atoms: Array)
+  signal mode_changed(old_mode: String, new_mode: String)
+  signal sleep_activated(sleep_type: String)
+  signal sleep_exited()
+  signal generation_started()
+  signal generation_cancelled()
+
+HTTP REQUEST WRAPPER:
+  All REST calls go through ZADOSClient._request(method, path, body) which:
+    - Prepends base_url
+    - Adds session_id header if set
+    - Returns { ok: bool, status: int, data: Dictionary, error: String }
+    - On HTTP 0 / timeout -> emits connection_lost, enters reconnect loop
+    - On HTTP 4xx -> returns error to caller, does NOT retry
+    - On HTTP 5xx -> returns error to caller, logs to error_log
+    - Timeout: 30s for /process, 10s for all other endpoints
+
+WEBSOCKET LIFECYCLE:
+  - Connects on startup (step 6) to ws://localhost:8000/stream/process
+  - Reconnection strategy:
+      On disconnect -> set ws_connected = false
+      Attempt reconnect: exponential backoff 1s, 2s, 4s, 8s, max 30s
+      Max attempts: unlimited (keep trying until server returns)
+      On reconnect -> set ws_connected = true, emit connection_restored
+  - If disconnect happens MID-GENERATION:
+      -> Set is_generating = false
+      -> Emit turn_error({ reason: "ws_disconnect", phase: last_known_phase })
+      -> The incomplete turn is NOT saved to conversation history
+      -> On reconnect, do NOT auto-replay the lost turn
+      -> UI shows "Generation interrupted. Send your message again to retry."
+
+GENERATION GUARD:
+  - Only one generation can run at a time
+  - If send_message() is called while is_generating == true:
+      -> Return immediately, do nothing (input bar should be disabled anyway)
+  - Generation timeout: 120 seconds total
+      -> If no WS events received for 30 seconds during generation, treat as
+         timeout -> emit turn_error({ reason: "timeout" })
+
+POLLING:
+  - /metrics is polled every 5 seconds ONLY when the user is on a workspace
+    that displays neurochem data (Conversation with NerdStats open, Dev, Sleep)
+  - Stop polling when on Memory, Learning, or Map workspaces (unless Map has
+    Live Link enabled)
+  - Emit metrics_updated on each successful poll
+
+--------------------------------------------------------------------------------
+A.3  ERROR STATES -- GLOBAL ERROR HANDLING CONTRACT
+--------------------------------------------------------------------------------
+
+Every API call in every workspace must handle these states. Workspaces should
+use a shared ErrorDisplay component.
+
+ERROR DISPLAY PATTERNS:
+
+  INLINE ERROR (for panels/sections that fail to load):
+    - Replace panel content with:
+      "[icon] Failed to load {section_name}"
+      "{error_message}"
+      "[Retry] button"
+    - The rest of the workspace remains functional
+
+  TOAST ERROR (for actions that fail):
+    - Bottom-left toast notification, auto-dismiss after 8 seconds:
+      "{action} failed: {reason}"
+      "[Dismiss] [Retry]"
+    - Used for: save actions, mode changes, manual triggers
+
+  BLOCKING ERROR (for operations that prevent all interaction):
+    - Full-workspace overlay:
+      "{operation} failed"
+      "{detailed_message}"
+      "[Retry] [Go to Conversation]"
+    - Used for: session creation failure, WebSocket death during generation
+
+  GENERATION ERROR (specific to /process and WS streaming):
+    - Replace the phase progress indicator with:
+      "[!] Generation failed at Phase {n}: {reason}"
+      "[Retry] [View Error Details]"
+    - Error details show: raw error response, phase timing up to failure point
+    - The user message that triggered the failed generation remains in the
+      input bar (not cleared) so they can retry without retyping
+
+SPECIFIC ERROR CASES:
+
+  POST /process returns 422 (validation error):
+    -> Toast: "Message rejected: {detail}" -- likely empty input or bad mode state
+
+  POST /process returns 500:
+    -> Generation error display with full error body
+
+  WS stream sends error event:
+    -> Generation error display, include phase reached before error
+
+  GET /memory/* returns 404:
+    -> Inline error: "No data available yet" (not a real error, just empty state)
+
+  GET /memory/* returns 500:
+    -> Inline error with retry
+
+  POST /session/set_mode returns error:
+    -> Toast error, mode selector reverts to previous mode visually
+
+  POST /dev/* returns error:
+    -> Toast error, slider/input reverts to previous value
+
+--------------------------------------------------------------------------------
+A.4  LOADING STATES
+--------------------------------------------------------------------------------
+
+Every data-dependent panel must show a loading state before data arrives.
+
+LOADING PATTERNS:
+
+  SKELETON LOADER:
+    - For panels that have a known layout (NerdStats tabs, Memory panels)
+    - Show gray placeholder shapes matching the expected content layout
+    - Subtle pulse animation
+
+  SPINNER:
+    - For actions with indeterminate duration (file upload, homework pipeline)
+    - Centered in the relevant panel/section
+
+  PROGRESS BAR:
+    - For operations with known phase count (generation, homework, sleep)
+    - Shows current phase / total phases
+
+RULES:
+  - A panel should NEVER show a blank white/dark rectangle while loading
+  - A panel should NEVER show stale data from a previous session/turn without
+    indicating it's stale (dim overlay + "from turn {n}" label)
+  - On workspace switch, if data is already cached, show cached data
+    immediately and refresh in background; flash a subtle "Updated" indicator
+    if new data differs from cached
+
+--------------------------------------------------------------------------------
+A.5  WORKSPACE SWITCHING DURING ACTIVE GENERATION
+--------------------------------------------------------------------------------
+
+This is the single biggest behavioral gap in the original spec. It lives in
+the cracks between every section.
+
+RULE: Generation ALWAYS continues in the background regardless of which
+workspace the user navigates to. It is never cancelled by navigation.
+
+BEHAVIOR:
+
+  1. User sends a message in Conversation Workspace
+     -> is_generating = true
+     -> generation_target_workspace = "conversation"
+     -> Phase progress indicator appears in Conversation panel
+
+  2. User switches to Memory Workspace mid-generation
+     -> Conversation Workspace scene is unloaded (Godot scene swap)
+     -> BUT: ZADOSClient continues receiving WS events (it's an autoload,
+        not tied to any scene)
+     -> ZADOSClient buffers the incoming turn result internally:
+        var _pending_result: Dictionary = {}
+     -> Phase events still update ZADOSClient.current_phase (int)
+
+  3. User switches back to Conversation Workspace
+     -> Workspace loads, checks ZADOSClient.is_generating
+     -> If still generating: show phase progress indicator at current_phase
+     -> If generation completed while away: _pending_result is non-empty
+        -> Append completed AI response to conversation history
+        -> Clear _pending_result
+        -> Show the response normally (no phase animation, just appears)
+
+  4. VISUAL INDICATOR WHILE AWAY:
+     -> NavBar "Conversation" tab shows a small animated dot/spinner badge
+        while is_generating == true, regardless of active workspace
+     -> This tells the user "something is still cooking in Conversation"
+
+  5. SLEEP ACTIVATION DURING CONVERSATION:
+     -> If sleep is activated (from Dev workspace or command), the
+        SleepOverlay appears ON TOP of whatever workspace is active
+     -> Sleep overlay has its own "Minimize" button to peek at workspaces
+        underneath, but sleep processing continues
+
+HOMEWORK / REFLECTIVE GENERATION:
+  - Same rules apply: Homework pipeline runs in background if user navigates away
+  - Learning Workspace tab gets the animated badge
+  - Results are buffered in ZADOSClient and displayed when user returns
+
+--------------------------------------------------------------------------------
+A.6  STATE SYNCHRONIZATION BETWEEN WORKSPACES
+--------------------------------------------------------------------------------
+
+Problem: When a turn completes, it may affect data in multiple workspaces
+simultaneously (new memory packets, updated neurochem, new atoms in map,
+new lessons, updated unsolved questions). Each workspace needs to know
+when its data is stale.
+
+STRATEGY: Event-driven invalidation with lazy refresh.
+
+TURN COMPLETION INVALIDATION MAP:
+  When turn_complete fires, the following workspace data is marked stale:
+
+  Conversation:  [always fresh -- it receives the result directly]
+  Memory/STMM:   stale (new compressed input)
+  Memory/MTMM:   stale (new memory packet + updated context)
+  Memory/LTMM:   stale (possible new lessons, journal entries, unsolved Qs)
+  Learning:      stale (new learning log entry if in learning mode)
+  Dev:           stale (new pipeline result, timing data)
+  Map:           stale IF Live Link is on (new atoms from E9)
+
+IMPLEMENTATION:
+  ZADOSClient maintains a Dictionary:
+    var _workspace_stale: Dictionary = {
+      "memory_stmm": false, "memory_mtmm": false, "memory_ltmm": false,
+      "learning": false, "dev": false, "map": false
+    }
+
+  On turn_complete -> set all to true
+  On workspace switch -> if target workspace's stale flag is true:
+    -> Show cached data immediately (if available)
+    -> Trigger background refresh for that workspace's data
+    -> On refresh complete: update display, clear stale flag
+    -> Subtle "Updated" flash on panels that changed
+
+  On sleep pipeline complete -> additionally mark map and memory_ltmm stale
+  On homework complete -> mark learning, memory_ltmm stale
+
+--------------------------------------------------------------------------------
+A.7  NEUROCHEM PULSE STRIP -- BEHAVIORAL SPEC
+--------------------------------------------------------------------------------
+
+The original spec describes appearance but not update behavior.
+
+LOCATION: Bottom of screen, persistent across all workspaces.
+HEIGHT: 6px (thin, unobtrusive)
+
+SEGMENTS: 5 colored bars, side by side, proportional width based on NT level.
+  DA  (gold)    -> state.modulation.nt_snapshot["dopamine"]
+  5HT (teal)    -> state.modulation.nt_snapshot["serotonin"]
+  NE  (orange)  -> state.modulation.nt_snapshot["norepinephrine"]
+  GABA (blue)   -> state.modulation.nt_snapshot["gaba"]
+  GLU (red)     -> state.modulation.nt_snapshot["glutamate"]
+
+UPDATE TRIGGER: On turn_complete AND on metrics_updated (polling)
+ANIMATION: Smooth width transition (0.3s ease) when values change.
+           Brief glow pulse (0.5s) on the segment that changed most.
+
+INTERACTION:
+  - Hover over a segment -> tooltip: "{NT name}: {value:.2f}"
+  - Click strip -> expands to 40px height showing all 5 values as labeled bars
+    with numeric readouts. Click again to collapse.
+
+DURING SLEEP: Strip color scheme shifts:
+  - Background darkens
+  - Segments become more muted/dim
+  - Sigma band indicator (pulsing indigo overlay) appears during REM
+
+--------------------------------------------------------------------------------
+A.8  SESSION STATUS INDICATOR -- BEHAVIORAL SPEC
+--------------------------------------------------------------------------------
+
+LOCATION: Left side of NavBar, always visible.
+CONTENT: "Branch {branch} | Turn {turn_count} | {mode_token}"
+
+UPDATE: On turn_complete (turn_count increments) and mode_changed.
+
+MODE TOKEN COLOR: Same color coding as NerdStats Tab 1:
+  Normal=gray, Learning=blue, Sleep/REM=indigo, Dream=purple,
+  Homework=amber, SelfReflective=teal
+
+CLICK BEHAVIOR: Clicking the session status opens a small popover showing:
+  - Session ID (copyable)
+  - Session start time
+  - Current branch name
+  - Total turns this session
+  - "End Session" button (with confirmation dialog)
+  - "New Branch" button (future feature, disabled for now)
+
+--------------------------------------------------------------------------------
+A.9  KEYBOARD SHORTCUTS
+--------------------------------------------------------------------------------
+
+Global (work in any workspace):
+  Ctrl+1 through Ctrl+5  -> Switch to workspace 1-5
+  Ctrl+Enter             -> Send message (when input bar focused)
+  Escape                 -> Close any open popover/modal/expanded panel
+  Ctrl+Shift+D           -> Toggle Dev workspace (quick access)
+  Ctrl+Shift+S           -> Open NerdStats (Conversation workspace)
+  Ctrl+Shift+T           -> Open Thinking panel (Conversation workspace)
+
+Conversation-specific:
+  Ctrl+Up/Down           -> Navigate through own message history (recall)
+
+Map-specific:
+  Ctrl+F                 -> Focus search bar
+  Space                  -> Re-layout graph
+  Delete                 -> Delete selected atom (with confirmation)
+
+================================================================================
+
+B. PER-WORKSPACE GAP FILLS
+================================================================================
+
+--------------------------------------------------------------------------------
+B.1  CONVERSATION WORKSPACE (original section 1)
+--------------------------------------------------------------------------------
+
+B.1.1  INPUT BAR -- MISSING BEHAVIORS
+
+  DURING GENERATION:
+    - Input bar is DISABLED (grayed out, not accepting text)
+    - Send button changes to "Stop" button (square icon)
+    - "Stop" button -> cancels generation:
+        -> Sends cancel event over WebSocket
+        -> Sets is_generating = false
+        -> Phase progress indicator replaced with "Generation cancelled"
+        -> User message remains in conversation history
+        -> No AI response is appended
+
+  EMPTY INPUT GUARD:
+    - Send button is disabled when input is empty or whitespace-only
+    - No API call is made on empty send
+
+  SLASH COMMANDS:
+    - Input starting with "/" is treated as a command, not a message
+    - Known commands: /sleep rem, /sleep dream, /homework
+    - Unknown "/" prefix -> toast: "Unknown command: {input}"
+    - Commands are NOT sent to /process -- they route to specific endpoints:
+        /sleep rem   -> POST /dev/sleep/activate { mode: "rem" }
+        /sleep dream -> POST /dev/sleep/activate { mode: "dream" }
+        /homework    -> POST /process with homework pipeline flag
+    - Command history: slash commands appear in conversation as system messages
+      (distinct style: monospace, muted color, no AI response bubble)
+
+  MESSAGE HISTORY RECALL:
+    - Ctrl+Up in the input bar cycles through previously sent messages
+    - Only user messages, not AI responses
+    - Ctrl+Down goes forward in history
+    - Editing a recalled message does NOT modify the history entry
+
+B.1.2  PHASE PROGRESS INDICATOR -- FAILURE BEHAVIOR
+
+  If a phase fails (error event from WebSocket):
+    - All completed phases keep their [*] checkmark
+    - Failed phase shows [!] with red highlight
+    - Subsequent phases show [ ] (never reached)
+    - Below the progress bar: error message from server
+    - "Retry" button re-sends the same user message
+
+  If WebSocket disconnects during generation:
+    - Phase indicator freezes at last known state
+    - After 5 seconds of no events: show "Connection lost..." warning
+    - On reconnect: show "Connection restored. Generation was interrupted."
+    - No automatic retry (user must re-send)
+
+  PHASE TIMING DISPLAY:
+    - Each completed phase shows elapsed time in small text: "[*] Phase 1 (340ms)"
+    - Total generation time shown after completion: "Completed in 2.4s"
+
+B.1.3  MODE SELECTOR POPUP -- FULL SPEC
+
+  TRIGGER: Click mode badge in input bar or press Ctrl+M
+
+  APPEARANCE: Popover above the input bar, not a modal (conversation visible)
+
+  CONTENT:
+    - Radio-style list of modes (same as Learning Workspace mode selector):
+        Regular (Normal)
+        Learning M1 -- Teach me something
+        Learning M2 -- Review / quiz me
+        Learning M3 -- Explore / socratic
+        Learning M4 -- Questions I have
+        Learning M5 -- Independent study
+        ----separator----
+        Self-Reflective -- Introspection on unsolved questions
+    - Current mode has a check indicator
+    - Homework and Reflective modes are NOT in this list (they are triggered
+      from Learning Workspace only)
+    - Sleep modes are NOT in this list (triggered from Dev or slash commands)
+
+  ON SELECT:
+    - Call POST /session/set_mode with selected mode
+    - On success: update mode badge, emit mode_changed signal
+    - On failure: revert selection, show toast error
+    - Close popover
+
+  DISABLED DURING GENERATION:
+    - Mode selector cannot be opened while is_generating == true
+    - Mode badge shows a lock icon overlay
+
+B.1.4  AI RESPONSE DETAIL TRAY -- DATA SOURCE MAPPING
+
+  The expand arrow on each AI response bubble shows:
+    intent_archetype    <- result.phase1_result.perception.intent_archetype
+    directive           <- result.phase5_result.meta_directive.allow_output
+                          (map to: ALLOW if true, check suppress/abstain flags)
+    selected_mode       <- result.state.modulation.mode_token
+    reward_profile_name <- result.state.modulation.reward_profile_name
+    dominant_emotion    <- result.phase3_result.e28_result.top_emotion
+                          (or state.dispatch.e28_result, pick highest score)
+
+  If any field is missing from the result (engine didn't run, phase skipped):
+    -> Show "N/A" in gray for that field
+
+B.1.5  CONVERSATION HISTORY PERSISTENCE
+
+  NOT SPECCED: What happens to conversation history between sessions?
+
+  RULE: Conversation history is session-scoped.
+    - History is stored in the Godot client as an Array[Dictionary]
+    - Each entry: { role: "user"|"ai"|"system", content: String,
+                    timestamp: int, turn_index: int, detail_tray: Dictionary }
+    - History is NOT persisted to disk by the frontend
+    - On session close / app restart, history starts empty
+    - The BACKEND has memory (STMM/MTMM/LTMM) so the AI remembers context,
+      but the visual chat log resets
+    - FUTURE: Add /session/history endpoint to restore visual history from
+      server-side turn logs
+
+--------------------------------------------------------------------------------
+B.2  MEMORY WORKSPACE (original section 2)
+--------------------------------------------------------------------------------
+
+B.2.1  STMM PANEL -- REFRESH TIMING
+
+  - Data refreshes on workspace switch (if stale) AND on turn_complete signal
+  - If user is actively viewing STMM when a turn completes:
+    -> Subtle highlight flash on fields that changed
+    -> Fields animate from old value to new value (numbers tween, text crossfade)
+  - If no session data yet (turn 0): show "No data yet -- send a message first"
+
+B.2.2  MTMM CONTEXT EDITOR -- CONFLICT HANDLING
+
+  Problem: User edits context prompt while a turn is being processed. The turn
+  uses the old context. User saves new context. Next turn uses new context.
+  But what if the user saves DURING processing?
+
+  RULE: Context editor is READ-ONLY during generation (is_generating == true).
+    - "Update" button disabled with tooltip: "Cannot edit during generation"
+    - Editor field shows a subtle lock overlay
+    - After generation completes, editor unlocks
+
+  ADDITIONAL:
+    - "Update" button shows confirmation: "This will change how ZADOS interprets
+      conversation context. Are you sure?" [Save] [Cancel]
+    - After save, success toast: "Context prompt updated"
+    - Character limit display: "{current}/{max}" with max = 4000 chars
+    - If POST /memory/mtmm/context fails: toast error, text remains in editor
+      (not cleared)
+
+B.2.3  MTMM MEMORY LOG -- PAGINATION
+
+  Problem: After many turns, the memory packet list could be very long.
+
+  RULE: Paginate. Load 20 packets at a time, newest first.
+    - "Load more" button at bottom (or infinite scroll)
+    - Each page: GET /memory/mtmm/packets?offset={n}&limit=20
+    - Total count displayed: "Showing {loaded}/{total} packets"
+    - NOTE: Bridge server needs offset/limit params (see API additions)
+
+B.2.4  LTMM LIBRARY UPLOAD -- FULL FILE LIFECYCLE
+
+  The original spec says "Upload interface: PDF, DOCX, TXT ingestion" but
+  doesn't describe the flow.
+
+  UPLOAD FLOW:
+    1. User clicks "Upload Document" button
+    2. Godot FileDialog opens (native OS file picker)
+       -> Filter: *.pdf, *.docx, *.txt
+    3. User selects file -> file path stored
+    4. UI shows: "{filename} ({size})" with [Upload] [Cancel] buttons
+    5. User clicks Upload:
+       -> Input area shows progress: "Uploading... {percent}%"
+       -> POST /memory/ltmm/knowledge/library (multipart form with file)
+       -> On success: "Processing..." spinner while server ingests
+       -> Server returns { id, title, status: "processing" }
+       -> Poll GET /memory/ltmm/knowledge/library/{id} every 2s
+       -> When status changes to "ready": add to document list, show toast
+       -> When status is "error": show error in upload area, allow retry
+    6. File appears in document list with all fields populated
+
+  DELETION:
+    - "Delete" button on each document card
+    - Confirmation dialog: "Delete '{title}'? This cannot be undone."
+    - DELETE /memory/ltmm/knowledge/library/{id}
+    - On success: remove from list, toast
+    - On failure: toast error, item remains
+
+B.2.5  LTMM UNSOLVED -- "MARK RESOLVED" FLOW
+
+  1. User clicks "Mark Resolved" on an unsolved question
+  2. Modal opens: "How was this resolved?"
+     -> Text area for resolution note (required, min 10 chars)
+     -> [Resolve] [Cancel]
+  3. POST /memory/ltmm/unsolved/{id}/resolve { note: "..." }
+  4. On success: card moves to "Resolved" section (or disappears from active
+     list with filter), toast "Question resolved"
+  5. On failure: toast error, modal stays open
+
+B.2.6  LTMM UNSOLVED -- "SEND TO CONVERSATION" BEHAVIOR
+
+  1. User clicks "Send to Conversation" on an unsolved question
+  2. Switch to Conversation Workspace (workspace swap)
+  3. Pre-fill input bar with the question text
+  4. Do NOT auto-send -- let the user review/edit before sending
+  5. Add a small label above input bar: "From Unsolved Question #{id}"
+     (dismissible, purely informational)
+
+B.2.7  LTMM UNSOLVED -- "SEND TO SELF-REFLECTIVE" BEHAVIOR
+
+  1. User clicks "Send to Self-Reflective"
+  2. Confirmation: "Start Self-Reflective Query on this question?"
+  3. On confirm:
+     -> POST /session/set_mode { mode: "self_reflective" }
+     -> POST /process { input: question_text, meta: { source: "unsolved", id: id } }
+     -> Switch to Conversation Workspace
+     -> Show generation in progress (same as normal turn)
+
+B.2.8  LTMM JOURNAL -- "TRIGGER JOURNAL ENTRY" BEHAVIOR
+
+  1. User clicks "Trigger Journal Entry"
+  2. Confirmation: "Write a journal entry for the current session state?"
+  3. On confirm:
+     -> POST /memory/ltmm/journal/trigger
+     -> Show spinner on button: "Writing..."
+     -> On success: new entry appears at top of journal list, toast
+     -> On failure: toast error
+
+B.2.9  LTMM KNOWLEDGE -- NOTEBOOK "NEW ENTRY" FLOW
+
+  1. User clicks "New Entry"
+  2. Inline editor appears at top of list:
+     -> Title field (text input, required)
+     -> Tags field (comma-separated text input)
+     -> Content area (multiline rich text -- or plain text for v1)
+     -> [Save] [Cancel]
+  3. On save: POST /memory/ltmm/knowledge/notebook { title, tags, content }
+  4. On success: entry appears in list, editor closes
+  5. On failure: toast error, editor stays open with content preserved
+
+B.2.10  LTMM ACADEMIC BUFFER -- "MARK RESOLVED" FLOW
+
+  Same pattern as Unsolved (B.2.5):
+  1. Click "Mark Resolved"
+  2. Modal: resolution note (required)
+  3. POST /memory/ltmm/knowledge/academic_buffer/{id}/resolve { note }
+  4. Status changes to "Resolved" in UI
+
+  DOES resolving an Academic Buffer entry also affect the Unsolved Buffer?
+  -> NO. They are separate stores. An academic buffer entry may have originated
+     from an unsolved question, but resolving it here does not auto-resolve
+     the source question. The user must resolve both independently if desired.
+     -> UI hint: if the entry has a source_question_id, show a link:
+        "Source question: [View in Unsolved]" (clicking navigates there)
+
+--------------------------------------------------------------------------------
+B.3  LEARNING WORKSPACE (original section 3)
+--------------------------------------------------------------------------------
+
+B.3.1  MODE SWITCHING -- GUARD RAILS
+
+  Can the user switch modes mid-generation?
+  -> NO. Mode selector radio buttons are disabled while is_generating == true.
+  -> Visual: grayed out with tooltip "Cannot change mode during generation"
+
+  Can the user switch FROM Homework mode while homework is running?
+  -> YES, but with confirmation: "Homework is still processing. Switching modes
+     will NOT cancel the homework run. Continue?"
+  -> Homework continues in background (ZADOSClient keeps receiving events)
+  -> If user switches back to Homework view, progress display resumes
+
+B.3.2  HOMEWORK MODE -- "TRIGGER" BUTTON STATES
+
+  IDLE: Button shows "Run Homework" (enabled)
+  RUNNING: Button shows "Homework Running..." (disabled) with animated spinner
+  COMPLETE: Button shows "Run Homework" (enabled) + summary visible below
+  ERROR: Button shows "Run Homework" (enabled) + error banner above
+
+  During homework run (button disabled):
+    - Phase stepper updates in real-time via WebSocket
+    - Each phase panel expands automatically as it begins
+    - "Cancel Homework" link (below button) -> POST /dev/pipeline/cancel
+      -> Confirmation: "Cancel homework? Partial results will be discarded."
+
+B.3.3  HOMEWORK -- STREAMING MECHANISM
+
+  Homework uses the SAME WebSocket as conversation (/stream/process) but with
+  different event types:
+
+  WS event types during homework:
+    { type: "homework_phase", phase: 0-5, status: "started"|"progress"|"complete",
+      data: { ... phase-specific summary ... } }
+    { type: "homework_complete", summary: { ... full run summary ... } }
+    { type: "homework_error", phase: int, error: String }
+
+  ZADOSClient emits:
+    signal homework_phase_updated(phase: int, status: String, data: Dictionary)
+    signal homework_complete(summary: Dictionary)
+    signal homework_error(phase: int, error: String)
+
+B.3.4  REFLECTIVE MODE -- MISSING SPEC
+
+  The original spec has 3 lines for Reflective mode. Expanding:
+
+  TRIGGER: "Start Reflective Synthesis" button
+
+  FLOW:
+    1. Button click -> confirmation: "Start reflective synthesis for this session?"
+    2. POST /process { mode: "reflective" }
+    3. Streaming via WebSocket (same mechanism as conversation):
+       -> Phase events show synthesis progress
+       -> Token streaming for the reflective output
+    4. Output appears as a conversation turn in the Conversation Workspace
+       (the reflective output IS a conversation response)
+    5. Journal entry is auto-written (appears in LTMM/Journal)
+
+  DISPLAY WHILE RUNNING:
+    - Shows which turns/topics are being synthesized (from WS events)
+    - Preview of reflective entry as it streams
+    - "View in Journal" link after completion
+
+B.3.5  SELF-REFLECTIVE MODE -- ENTRY POINTS
+
+  Can be triggered from:
+    1. Learning Workspace mode selector
+    2. Conversation Workspace mode selector (mode badge popup)
+    3. Unsolved Questions "Send to Self-Reflective" button
+    4. Slash command (future: /reflect)
+
+  All entry points converge to:
+    -> POST /session/set_mode { mode: "self_reflective" }
+    -> Then normal conversation flow (user sends message, gets response)
+    -> No special UI beyond the mode indicator changing
+
+--------------------------------------------------------------------------------
+B.4  DEV WORKSPACE (original section 4)
+--------------------------------------------------------------------------------
+
+B.4.1  REWARD SYSTEM PANEL -- IMMEDIATE vs DEFERRED EFFECT
+
+  When user adjusts domain weight sliders and clicks "Set as Override":
+    -> Takes effect on the NEXT turn (not retroactively)
+    -> Toast: "Domain weights overridden. Changes apply on next turn."
+    -> Slider values persist until "Reset to Static" is clicked or session ends
+
+  When user clicks "Reset to Static":
+    -> Confirmation: "Reset domain weights to profile defaults?"
+    -> POST /dev/reward/reset_weights
+    -> Sliders snap to static profile values
+    -> Toast: "Domain weights reset to {profile_name} defaults"
+
+  E17 Parameter Learning toggle:
+    -> When disabled: learned_domain_weights freeze at current values
+    -> When enabled: resume adaptive learning
+    -> Toggle state is NOT persisted across sessions
+
+B.4.2  SLEEP ACTIVATION -- WHAT HAPPENS TO THE UI
+
+  When user clicks "Activate REM/Dream/Triage":
+    1. Confirmation: "Activate {mode}? This will pause normal conversation."
+    2. POST /dev/sleep/activate { mode: "rem"|"dream"|"triage" }
+    3. On success:
+       -> SleepOverlay.tscn is shown (added to scene tree ABOVE WorkspaceContainer)
+       -> The appropriate sub-workspace loads (REMWorkspace or DreamWorkspace)
+       -> NavBar shows sleep indicator: mode token turns indigo/purple
+       -> Conversation input bar is DISABLED with message:
+          "Sleep mode active. Exit sleep to resume conversation."
+       -> emit sleep_activated(mode)
+    4. "Exit Sleep" button (in Dev workspace AND in the SleepOverlay):
+       -> POST /dev/sleep/exit
+       -> SleepOverlay is hidden (removed from scene tree)
+       -> Conversation input re-enabled
+       -> emit sleep_exited
+       -> Mode token reverts to Normal (or previous mode)
+
+  CAN THE USER NAVIGATE WHILE SLEEP IS ACTIVE?
+    -> YES. The SleepOverlay has a "Minimize" button that collapses it to a
+       thin bar at the top: "Sleep Mode Active [REM] -- [Expand] [Exit]"
+    -> User can switch to Memory, Learning, etc. to inspect results
+    -> The minimized bar persists across all workspaces
+    -> Clicking "Expand" re-opens the full sleep workspace overlay
+    -> Sleep processing continues regardless of overlay visibility
+
+B.4.3  HARDCODED DEFAULTS EDITOR -- SAVE BEHAVIORS
+
+  "Session only" save:
+    -> POST /dev/defaults/update { scope: "session", values: {...} }
+    -> Changes live in server memory only, lost on server restart
+    -> Badge on changed fields: "Session override"
+
+  "Write to disk" save:
+    -> POST /dev/defaults/update { scope: "persistent", values: {...} }
+    -> Server writes to hardcoded/defaults.py on disk
+    -> Confirmation: "This permanently modifies defaults.py. Are you sure?"
+    -> Badge on changed fields: "Persistent override"
+    -> Does NOT require server restart (values are reloaded in-memory)
+
+  Change log:
+    -> List of all modifications this session: field, old value, new value,
+       scope (session/persistent), timestamp
+    -> "Revert" button per change (reverts that single field)
+
+B.4.4  PIPELINE DIAGNOSTICS -- REFRESH BEHAVIOR
+
+  - Auto-refreshes on turn_complete signal
+  - "Last PipelineResult" JSON tree: collapsible, with syntax highlighting
+    -> Search/filter field at top (Ctrl+F within the tree)
+  - Phase timing: horizontal bar chart (one bar per phase, labeled with ms)
+  - Engine dispatch log: table with columns:
+    Engine # | Name | Weight | Decision (run/skip) | Time (ms) | Result size
+  - Error log: reverse-chronological list of any errors this session
+    -> Each entry: timestamp, phase, error type, message, stack trace (collapsed)
+
+--------------------------------------------------------------------------------
+B.5  MAP WORKSPACE (original section 5)
+--------------------------------------------------------------------------------
+
+B.5.1  PERFORMANCE BOUNDS
+
+  Problem: AtomSpace can grow very large. Force-directed layout becomes
+  unusable above a certain node count.
+
+  RULES:
+    - Default: load max 500 nodes + their links
+    - If AtomSpace has >500 atoms: show top 500 by STI (attention)
+    - Warning banner: "Showing top 500 of {total} atoms by attention value.
+      Use filters to narrow."
+    - Filter by type or search narrows the set (may pull in lower-STI atoms)
+    - Layout computation caps at 200ms per frame; if exceeded, layout pauses
+      and "Resume Layout" button appears
+
+B.5.2  LIVE LINK -- WEBSOCKET MECHANISM
+
+  Live Link uses the atom_delta signal from ZADOSClient.
+
+  Implementation:
+    - When Live Link toggle is ON:
+      -> ZADOSClient starts polling GET /cognitools/atomspace/delta after
+         each turn_complete
+      -> Response: list of atoms created/modified/deleted this turn
+      -> Canvas applies incremental updates (add/modify/remove nodes+edges)
+      -> New nodes pulse animation (gold glow, 1s)
+      -> Modified nodes flash (brief highlight, 0.5s)
+      -> Deleted nodes fade out (0.3s) then remove
+    - When Live Link toggle is OFF:
+      -> No auto-updates
+      -> "Refresh" button to manually pull full atom list
+
+B.5.3  MAP SELECTOR -- LOAD/SAVE FLOW
+
+  LOADING A MAP:
+    1. Select map from dropdown
+    2. If current canvas has unsaved changes:
+       -> Confirmation: "Load '{map_name}'? Unsaved changes will be lost."
+       -> [Save Current & Load] [Load Without Saving] [Cancel]
+    3. POST /memory/ltmm/knowledge/maps/{id}/load
+    4. Canvas clears and populates with loaded map's atoms
+
+  SAVING A MAP:
+    1. Click "Save" (or Ctrl+S in Map workspace)
+    2. If map was loaded from existing: overwrites silently (auto-save feel)
+    3. If this is a new unsaved map: prompt for name
+       -> "Save map as: [________] [Save] [Cancel]"
+    4. POST /memory/ltmm/knowledge/maps/save { name, atoms }
+    5. Toast: "Map saved"
+
+  "NEW MAP":
+    -> Clears canvas
+    -> Sets current map to unnamed/unsaved
+    -> Map selector shows "Untitled Map *"
+
+B.5.4  INSPECTOR PANEL -- EDIT VALIDATION
+
+  TruthValue sliders:
+    - strength: 0.0 to 1.0, step 0.01
+    - confidence: 0.0 to 1.0, step 0.01
+    - On change: immediate PUT /cognitools/atomspace/atoms/{id}
+      { truth_value: { strength, confidence } }
+    - On failure: slider snaps back to previous value, toast error
+
+  AttentionValue inputs:
+    - STI: integer, -1000 to 1000
+    - LTI: integer, 0 to 1000
+    - On change (debounced 500ms): PUT request
+    - On failure: revert, toast
+
+  "Add Link" dialog:
+    - Link type dropdown (InheritanceLink, SimilarityLink, etc.)
+    - Target atom search (autocomplete from atom name list)
+    - TruthValue for the link: strength + confidence sliders
+    - [Create] [Cancel]
+    - On create: POST /cognitools/atomspace/links
+    - New link appears on canvas immediately
+
+  "Delete Atom" confirmation:
+    -> "Delete '{atom_name}' and all its links? This cannot be undone."
+    -> DELETE /cognitools/atomspace/atoms/{id}
+    -> Atom + connected links removed from canvas with fade-out
+
+--------------------------------------------------------------------------------
+B.6  SLEEP SUB-WORKSPACES (original section 6)
+--------------------------------------------------------------------------------
+
+B.6.1  REM WORKSPACE -- STREAMING MECHANISM
+
+  REM uses WebSocket events like homework:
+
+  WS event types during REM:
+    { type: "rem_phase", phase: 1-4, status: "started"|"progress"|"complete",
+      data: { ... } }
+    { type: "rem_packet_scan", packet_id: str, signal: str, weight_delta: dict }
+    { type: "rem_consolidation", packet_id: str, action: "promote"|"decay" }
+    { type: "rem_journal_stream", token: str }
+    { type: "rem_complete", summary: dict }
+
+  ZADOSClient signals:
+    signal rem_phase_updated(phase: int, status: String, data: Dictionary)
+    signal rem_complete(summary: Dictionary)
+
+B.6.2  REM WORKSPACE -- EXIT BEHAVIOR
+
+  User presses "Exit Sleep" during REM processing:
+    -> Confirmation: "REM is still processing. Exit now?"
+       -> [Wait for completion] [Exit anyway]
+    -> "Exit anyway":
+       -> POST /dev/sleep/exit
+       -> REM processing is ABORTED server-side
+       -> Partial results (consolidations already done) are kept
+       -> Journal entry is NOT written (Phase 4 didn't complete)
+       -> SleepOverlay closes, return to normal mode
+    -> "Wait for completion":
+       -> Dialog closes, REM continues normally
+
+B.6.3  DREAM WORKSPACE -- CANDIDATE INTERACTION
+
+  Can the user skip a dream candidate?
+  -> YES. Each candidate card has a "Skip" button.
+  -> Skipping moves to the next candidate in the priority queue.
+  -> Skipped candidates are NOT marked resolved and will appear again.
+
+  Can the user reorder candidates?
+  -> NO. Priority order is determined by the backend (identity > general > academic).
+  -> The user can only skip or let them process in order.
+
+  Scene shift:
+  -> Manual "Scene Shift" button triggers:
+     1. JournalTool writes reflective entry for current scene
+     2. Current candidate is marked as partially addressed (stagnation reduced)
+     3. Next candidate batch begins
+  -> Journal entry streams in real-time in the Phase 4 / Journal panel
+  -> Auto scene shift: if the dream pipeline detects low creative output
+     (server-side heuristic), it auto-shifts and the UI updates accordingly
+
+B.6.4  DREAM WORKSPACE -- COMPLETION
+
+  When all candidates are processed (or skipped):
+    -> Dream pipeline sends { type: "dream_complete", summary: dict }
+    -> Summary panel shows: candidates processed, stagnation reductions,
+       novel connections generated, journal entries written
+    -> "Exit Sleep" button becomes prominent: "Dream complete. [Exit Sleep]"
+    -> If user doesn't exit, the overlay stays (showing summary) until they do
+
+================================================================================
+
+C. BRIDGE SERVER API ADDITIONS (merge into section 7)
+================================================================================
+
+NEW ENDPOINTS:
+
+  Health / Connection:
+    GET  /health                        -> { status: "ok", version: str }
+
+  Session (additions):
+    GET  /session/bootstrap_status      -> { status: "skipped"|"running"|"complete",
+                                             progress: { current: int, total: int } }
+
+  Memory (additions -- pagination support):
+    GET  /memory/mtmm/packets?offset=N&limit=M  -> paginated packet list
+    GET  /memory/ltmm/journal?offset=N&limit=M   -> paginated journal list
+    DELETE /memory/ltmm/knowledge/library/:id     -> delete ingested document
+    GET    /memory/ltmm/knowledge/library/:id     -> single document status/detail
+
+  Processing (additions):
+    POST /dev/pipeline/cancel           -> cancel running homework/reflective
+
+  Sleep pipeline status (additions):
+    GET  /pipeline/rem/status           -> { phase: int, progress: float,
+                                             packets_scanned: int, ... }
+    GET  /pipeline/dream/status         -> { active_candidate: str,
+                                             candidates_remaining: int, ... }
+
+WEBSOCKET EVENT TYPE ADDITIONS:
+
+  The original spec only describes conversation streaming. Add these event
+  namespaces:
+
+  Conversation:
+    { type: "phase_start",    phase: int }
+    { type: "phase_complete", phase: int, data: dict }
+    { type: "token",          token: str, phase: int }
+    { type: "turn_complete",  result: dict }
+    { type: "turn_error",     phase: int, error: str }
+
+  Homework:
+    { type: "homework_phase", phase: int, status: str, data: dict }
+    { type: "homework_complete", summary: dict }
+    { type: "homework_error",    phase: int, error: str }
+
+  REM:
+    { type: "rem_phase",           phase: int, status: str, data: dict }
+    { type: "rem_packet_scan",     packet_id: str, signal: str, weight_delta: dict }
+    { type: "rem_consolidation",   packet_id: str, action: str }
+    { type: "rem_journal_stream",  token: str }
+    { type: "rem_complete",        summary: dict }
+
+  Dream:
+    { type: "dream_candidate_start",  candidate_id: str, tier: str }
+    { type: "dream_recombination",    token: str }
+    { type: "dream_scene_shift",      journal_entry: dict }
+    { type: "dream_complete",         summary: dict }
+
+  System:
+    { type: "error",       message: str }
+    { type: "cancel_ack",  pipeline: str }
+
+================================================================================
+
+D. GODOT SCENE STRUCTURE ADDITIONS (merge into section 8)
+================================================================================
+
+Updated tree with new components:
+
+Main (Node)
++-- ZADOSClient (autoload singleton -- NOT in scene tree directly)
++-- NavBar (HBoxContainer)
+|   +-- SessionStatusIndicator (Control)
+|   +-- WorkspaceButtons (HBoxContainer)
+|   |   +-- ConversationBtn (with generation_badge indicator)
+|   |   +-- MemoryBtn
+|   |   +-- LearningBtn (with homework_badge indicator)
+|   |   +-- DevBtn
+|   |   +-- MapBtn
+|   +-- KeyboardShortcutHandler (Node)
++-- StatusStrip (Control)            <- persistent bottom bar (NeurochemPulseStrip)
++-- WorkspaceContainer (Control)     <- scene swap target
+|   scenes: [same as original, plus:]
+|   +-- StartupScreen.tscn           <- connection/loading screen
+|   +-- ErrorScreen.tscn             <- blocking error display
++-- SleepOverlay.tscn               <- shown/hidden on sleep activation
+|   +-- MinimizedSleepBar (Control)  <- collapsed sleep indicator
+|   +-- REMWorkspace
+|   +-- DreamWorkspace
++-- ToastContainer (Control)         <- bottom-left toast stack
++-- ModalContainer (Control)         <- centered modal overlay
+
+SHARED COMPONENTS (used across workspaces):
+  - ErrorDisplay.tscn        (inline error with retry)
+  - LoadingSkeleton.tscn     (skeleton loader for panels)
+  - ConfirmationDialog.tscn  (reusable confirm/cancel modal)
+  - Toast.tscn               (auto-dismissing notification)
+
+================================================================================
+
+E. OPEN QUESTIONS UPDATED (merge into section 10)
+================================================================================
+
+Original questions 1-5 remain. Add:
+
+6. Conversation history persistence -- currently session-scoped and client-only.
+   Should the bridge server expose a /session/history endpoint to allow
+   restoring visual chat history on reconnect or across sessions?
+
+7. Multi-pipeline concurrent execution -- can Homework run while the user is
+   having a normal conversation? Current spec implies no (mode switch required),
+   but the backend may support it. Needs backend confirmation.
+
+8. Atom count scaling -- the 500-atom cap on Map workspace is a UI heuristic.
+   Should this be configurable? Should there be a "full graph" export mode
+   that renders a static image instead of interactive canvas?
+
+9. Undo/redo -- no undo system is specced anywhere. Should the Map workspace
+   support undo for atom edits? Should the MTMM context editor support undo?
+
+10. Accessibility -- no a11y spec exists. Screen reader labels, keyboard
+    navigation order, color-blind safe palette for neurochem strips, ARIA
+    roles for custom controls.
+
+11. Notification system -- beyond toast errors, should there be a persistent
+    notification panel? E.g., "Homework completed 5 minutes ago" if user
+    was in a different workspace. Currently handled by stale flags + badge,
+    but a notification log might be useful.
+
+================================================================================
+END OF ADDENDUM
+================================================================================
