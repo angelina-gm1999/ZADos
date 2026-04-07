@@ -19,10 +19,16 @@
 The concept library parser (`src/zados/bootstrap/concept_library_parser.py`) reads this file and produces structured `ConceptEntry` objects. The bootstrap system seeds these into AtomSpace as typed atoms with inheritance links, evaluation links, and truth values — giving the system a shared conceptual vocabulary before its first interaction. This is what allows cognitive engines to reference a common ontology from the first turn.
 
 **HUMINT Manual → Engine 23**
-Engine 23 (Intention Map) uses a computational adaptation of the intent classification framework documented in the HUMINT manual. The connection between the HUMINT analytical methodology and Engine 23's behavioral classification is discussed in the ethics documentation (`DOCUMENTS/ETHICS_SAFETY_ALIGNMENT/`) and the open questions document (`DOCUMENTS/STATE_NEXTSTEPS_CALLFORACTION/OPENQUESTIONS_CHALLENGES_CALL_FOR_ACTION.md`, Section 4 — Dual-Use Capabilities). This attribution is stated explicitly for transparency.
+Engine 23 (Intention Map) uses a computational adaptation of the intent classification framework documented in the HUMINT manual. The connection between the HUMINT analytical methodology and Engine 23's behavioral classification is discussed in the ethics documentation (`DOCUMENTS/ETHICS_SAFETY_ALIGNMENT/`) and the open questions document (`DOCUMENTS/STATE_NEXTSTEPS_CALLFORACTION/OPENQUESTIONS_CHALLENGES_CALL_FOR_ACTION.md`, Section 4 — Dual-Use Capabilities). 
+This attribution is stated explicitly for transparency.
 
 ---
 
 ## Note
 
 These materials are included for traceability and attribution. The concept library is an active dependency of the bootstrap system. The HUMINT manual is a reference document that contextualizes the design of Engine 23. Neither is intended as standalone reading — they are source materials that the architecture draws from.
+
+
+
+
+ZADos © 2025 by Angela Garcia is licensed under Creative Commons Attribution-NonCommercial 4.0 International
