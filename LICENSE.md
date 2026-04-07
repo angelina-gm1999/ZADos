@@ -112,3 +112,4 @@ The copyright holder reserves the right to offer different or additional licensi
 
 **For questions, review requests, or collaboration inquiries: [angelina.garcia.mv@gmail.com
 ]**
+ZADos © 2025 by Angela Garcia is licensed under Creative Commons Attribution-NonCommercial 4.0 International
