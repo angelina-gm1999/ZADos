@@ -14,8 +14,9 @@ The frontend does **not** run any cognitive logic. It renders state received fro
 
 ## Quick Start
 
-1. Open the project in **Godot 4.6+**
-2. Start the Python backend (`FastAPI` server on `localhost:8000`)
+0. Install Godot (https://godotengine.org/download/windows/)
+1. Inside the root project activate the environment and open the port by running: ".venv\Scripts\python.exe -m uvicorn bridge.server:app --port 8000"
+2. Open the project in **Godot 4.6+**
 3. Press F5 (or Run Project) in Godot
 
 The `ZADOSClient` autoload connects automatically on launch.
@@ -317,7 +318,6 @@ Most workspaces use `.tscn` scene files for layout, with scripts adding dynamic 
 - Status strip (session info + NT pulse)
 
 **In Progress:**
-- Backend FastAPI bridge (the Python server wrapping the ZADOS orchestrator is under development)
 - End-to-end integration testing with live backend
 - Polish: animations, transitions, responsive layout edge cases
 
