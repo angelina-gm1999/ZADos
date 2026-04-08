@@ -1,0 +1,72 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/workspaces/ConversationWorkspace.gd" id="1_conv"]
+[ext_resource type="Script" path="res://scripts/panels/ThinkingPanel.gd"             id="2_think"]
+[ext_resource type="Script" path="res://scripts/panels/StatsPanel.gd"                id="3_stats"]
+
+[node name="ConversationWorkspace" type="Control"]
+anchor_right  = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_conv")
+
+[node name="MainLayout" type="HBoxContainer" parent="."]
+anchor_right  = 1.0
+anchor_bottom = 1.0
+
+[node name="ThinkingPanel" type="Control" parent="MainLayout"]
+clip_contents       = true
+custom_minimum_size = Vector2(0, 0)
+script = ExtResource("2_think")
+
+[node name="ThinkingToggle" type="Button" parent="MainLayout"]
+text                = "❯"
+flat                = true
+focus_mode          = 0
+custom_minimum_size = Vector2(18, 0)
+size_flags_vertical = 3
+tooltip_text        = "Thinking Blocks  [T]"
+
+[node name="CenterArea" type="VBoxContainer" parent="MainLayout"]
+size_flags_horizontal = 3
+
+[node name="MessageScroll" type="ScrollContainer" parent="MainLayout/CenterArea"]
+size_flags_vertical    = 3
+horizontal_scroll_mode = 0
+
+[node name="MessageList" type="VBoxContainer" parent="MainLayout/CenterArea/MessageScroll"]
+size_flags_horizontal = 3
+
+[node name="InputBar" type="HBoxContainer" parent="MainLayout/CenterArea"]
+custom_minimum_size = Vector2(0, 64)
+
+[node name="ModeButton" type="Button" parent="MainLayout/CenterArea/InputBar"]
+text                = "Normal"
+flat                = true
+focus_mode          = 0
+custom_minimum_size = Vector2(90, 0)
+size_flags_vertical = 3
+tooltip_text        = "Active mode"
+
+[node name="InputText" type="TextEdit" parent="MainLayout/CenterArea/InputBar"]
+size_flags_horizontal = 3
+size_flags_vertical   = 3
+placeholder_text      = "Type a message…   (Enter = send,  Shift+Enter = newline)"
+wrap_mode             = 1
+
+[node name="SendButton" type="Button" parent="MainLayout/CenterArea/InputBar"]
+text                = "Send"
+custom_minimum_size = Vector2(80, 0)
+size_flags_vertical = 3
+
+[node name="StatsToggle" type="Button" parent="MainLayout"]
+text                = "❮"
+flat                = true
+focus_mode          = 0
+custom_minimum_size = Vector2(18, 0)
+size_flags_vertical = 3
+tooltip_text        = "Nerd Stats  [S]"
+
+[node name="StatsPanel" type="Control" parent="MainLayout"]
+clip_contents       = true
+custom_minimum_size = Vector2(0, 0)
+script = ExtResource("3_stats")
