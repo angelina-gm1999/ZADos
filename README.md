@@ -197,6 +197,7 @@ STATUS
   - 5 learning modes, 2 sleep modes
   - Session orchestrator with branch classification
   - In progress: UI development for testing in Godot Engine
+  - In progress: considering hardcoded sections on identity and values
 
 
 ETHICAL CONSIDERATIONS
