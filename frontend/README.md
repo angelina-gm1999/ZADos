@@ -318,6 +318,7 @@ Most workspaces use `.tscn` scene files for layout, with scripts adding dynamic 
 - Status strip (session info + NT pulse)
 
 **In Progress:**
+-Debugging in the UI mid-term memory log errors and meta directive dict bugs.
 - End-to-end integration testing with live backend
 - Polish: animations, transitions, responsive layout edge cases
 
