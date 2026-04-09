@@ -1,7 +1,7 @@
 # ZADos
 A model-agnostic, bio-inspired Cognitive Architecture for Artificial Intelligence Systems
 
-ZADOS — Zonal Adaptive Dynamics Operating System
+ZADOS — Zonal Adaptive Dynamic Operating System
 =================================================
 
 A bio-inspired artificial cognition framework that wraps large language models
