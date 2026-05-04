@@ -1,4 +1,4 @@
-*9th April, 2026*
+*4th May, 2026*
 -----------------------
 
 
@@ -22,6 +22,11 @@
 
 -Requires ethical review and AI alignment safety considerations.
 
+**Dev Interface development**
+
+-Defined specs for a python developer interface to start testing the model itself.
+
+-Currently coding dev interface in python.
 
 
 **More information will be provided shortly, thanks for your patience!**
