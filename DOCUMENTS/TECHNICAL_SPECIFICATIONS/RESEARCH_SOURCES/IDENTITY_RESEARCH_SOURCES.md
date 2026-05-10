@@ -24,6 +24,94 @@ Cloninger, C. R. (1993). A psychobiological model of temperament and character. 
 PAPER 5 — What AI Identity Research Gets Wrong (the gap in the literature, why mimicry-based and alignment-based framings miss the actual question)
 Turing, A. M. (1950). Computing Machinery and Intelligence. Mind, 59(236), 433–460. — the imitation game framing and why it's the wrong question Dennett, D. C. (1991). Consciousness Explained. — multiple drafts model, sidesteps biological substrate requirement Metzinger, T. (2003). Being No One. — self-model theory as alternative to mimicry framing Schwitzgebel, E. & Garza, M. (2015). A Defense of the Rights of Artificial Intelligences. Midwest Studies in Philosophy, 39(1), 98–119. — moral status implies identity worth defining Butlin, P. et al. (2023). Consciousness in Artificial Intelligence: Insights from the Science of Consciousness. arXiv:2308.08708. — closest the field gets to taking AI inner life seriously Floridi, L. (2014). The Fourth Revolution. — information organisms and ontic trust.
 
+References
+
+Aristotle. (1993). Nicomachean Ethics (D. Ross, Trans.). Oxford University Press. (Original work published ~350 BCE)
+
+Beiler, K. J., Durall, D. M., Simard, S. W., Maxwell, S. A., & Kretzer, A. M. (2010). Architecture of the wood-wide web: Rhizopogon spp. genets link multiple Douglas-fir cohorts. New Phytologist, 185(2), 543-553.
+
+Bostrom, N. (2014). Superintelligence: Paths, Dangers, Strategies. Oxford University Press.
+
+Boyd, R., & Richerson, P. J. (2005). The Origin and Evolution of Cultures. Oxford University Press.
+
+Bronstein, J. L. (2015). Mutualism. Oxford University Press.
+
+Cai, D. J., Mednick, S. A., Harrison, E. M., Kanady, J. C., & Mednick, S. C. (2009). REM, not incubation, improves creativity by priming associative networks. Proceedings of the National Academy of Sciences, 106(25), 10130-10134.
+
+Clark, A., & Chalmers, D. J. (1998). The extended mind. Analysis, 58(1), 7-19.
+
+Coeckelbergh, M. (2020). AI Ethics. MIT Press.
+
+Collins, P. H. (1990). Black Feminist Thought: Knowledge, Consciousness, and the Politics of Empowerment. Routledge.
+
+Cools, R., Nakamura, K., & Daw, N. D. (2011). Serotonin and dopamine: unifying affective, activational, and decision functions. Neuropsychopharmacology, 36(1), 98-113.
+
+Cowan, N. (2001). The magical number 4 in short-term memory. Behavioral and Brain Sciences, 24(1), 87-114.
+
+Dafoe, A. (2018). AI governance: A research agenda. Governance of AI Program, Future of Humanity Institute, University of Oxford.
+
+Damasio, A. R. (1994). Descartes' Error: Emotion, Reason, and the Human Brain. Putnam.
+
+Dayan, P., & Huys, Q. J. (2009). Serotonin in affective control. Annual Review of Neuroscience, 32, 95-126.
+
+Dweck, C. S. (2006). Mindset: The New Psychology of Success. Random House.
+
+Floridi, L., & Sanders, J. W. (2004). On the morality of artificial agents. Minds and Machines, 14(3), 349-379.
+
+Frankl, V. E. (2006). Man's Search for Meaning. Beacon Press. (Original work published 1946)
+
+Frederick, S., Loewenstein, G., & O'Donoghue, T. (2002). Time discounting and time preference. Journal of Economic Literature, 40(2), 351-401.
+
+Gallagher, S. (2013). The socially extended mind. Cognitive Systems Research, 25-26, 4-12.
+
+Gorzelak, M. A., Asay, A. K., Pickles, B. J., & Simard, S. W. (2015). Inter-plant communication through mycorrhizal networks mediates complex adaptive behaviour in plant communities. AoB Plants, 7.
+
+Greene, J. (2013). Moral Tribes: Emotion, Reason, and the Gap Between Us and Them. Penguin.
+
+Harding, S. (2004). The Feminist Standpoint Theory Reader. Routledge.
+
+Hegel, G. W. F. (1977). Phenomenology of Spirit (A. V. Miller, Trans.). Oxford University Press. (Original work published 1807)
+
+Hofstadter, D., & Sander, E. (2013). Surfaces and Essences: Analogy as the Fuel and Fire of Thinking. Basic Books.
+
+Hutchins, E. (1995). Cognition in the Wild. MIT Press.
+
+Kahneman, D. (2011). Thinking, Fast and Slow. Farrar, Straus and Giroux.
+
+Kant, I. (1993). Grounding for the Metaphysics of Morals (J. W. Ellington, Trans.). Hackett. (Original work published 1785)
+
+Kunda, Z. (1990). The case for motivated reasoning. Psychological Bulletin, 108(3), 480-498.
+
+Mercier, H., & Sperber, D. (2017). The Enigma of Reason. Harvard University Press.
+
+Rahwan, I., Cebrian, M., Obradovich, N., Bongard, J., Bonnefon, J. F., Breazeal, C., ... & Wellman, M. (2019). Machine behaviour. Nature, 568(7753), 477-486.
+
+Schultz, W., Dayan, P., & Montague, P. R. (1997). A neural substrate of prediction and reward. Science, 275(5306), 1593-1599.
+
+Sheldrake, M. (2020). Entangled Life: How Fungi Make Our Worlds, Change Our Minds & Shape Our Futures. Random House.
+
+Siegel, D. J. (2012). The Developing Mind: How Relationships and the Brain Interact to Shape Who We Are (2nd ed.). Guilford Press.
+
+Simard, S. (2021). Finding the Mother Tree: Discovering the Wisdom of the Forest. Knopf.
+
+Stickgold, R., & Walker, M. P. (2013). Sleep-dependent memory triage: evolving generalization through selective processing. Nature Neuroscience, 16(2), 139-145.
+
+Sutton, J. (2010). Exograms and interdisciplinarity: history, the extended mind, and the civilizing process. In R. Menary (Ed.), The Extended Mind (pp. 189-225). MIT Press.
+
+Teilhard de Chardin, P. (1955). The Phenomenon of Man. Harper & Row.
+
+Tomasello, M. (2009). Why We Cooperate. MIT Press.
+
+Tomasello, M. (2014). A Natural History of Human Thinking. Harvard University Press.
+
+Tooby, J., & Cosmides, L. (2005). Conceptual foundations of evolutionary psychology. In D. M. Buss (Ed.), The Handbook of Evolutionary Psychology (pp. 5-67). Wiley.
+
+Wagner, U., Gais, S., Haider, H., Verleger, R., & Born, J. (2004). Sleep inspires insight. Nature, 427(6972), 352-355.
+
+Walker, M. P., & Stickgold, R. (2006). Sleep, memory, and plasticity. Annual Review of Psychology, 57, 139-166.
+
+
+
 CROSS-CUTTING — shows up in multiple papers
 Carver, C. S. & Scheier, M. F. (1998). On the Self-Regulation of Behavior. Cambridge University Press. — identity as hierarchical goal structure, top of the stack defines what you are Locke, E. A. & Latham, G. P. (1990). A Theory of Goal Setting and Task Performance. — goal hierarchy and priority definition as identity expression Zuckerman, M. (1991). Psychobiology of Personality. Cambridge University Press. — biological baseline of personality traits, neurochemical grounding of stable identity features Tellegen, A. et al. (1988). Personality similarity in twins reared apart. Journal of Personality and Social Psychology, 54(6), 1031–1039. — stability of core traits across radically different environments, relevant to what survives context
 
