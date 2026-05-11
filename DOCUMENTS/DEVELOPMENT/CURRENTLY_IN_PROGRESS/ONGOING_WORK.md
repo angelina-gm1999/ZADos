@@ -38,8 +38,6 @@
 **More information will be provided shortly, thanks for your patience!**
 
 
-10th to 14th april - no commits. hopital.
-
 ----------------------------------------------------------------------------------------------------------------
 
 *For any questions or comments feel free to reach out through github or email contact provided in main readme.*
