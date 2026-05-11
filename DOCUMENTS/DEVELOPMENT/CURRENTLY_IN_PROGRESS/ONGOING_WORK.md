@@ -2,7 +2,7 @@
 -----------------------
 
 
-**UI development**
+**UI development** [on hold]
 
 -Last update: UI godot debugging and fixes
 
