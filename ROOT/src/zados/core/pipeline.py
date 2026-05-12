@@ -88,7 +88,17 @@ class AnswerPipeline:
         if hardcoded_store is not None:
             try:
                 from zados.memory.long_term.identity.alignment import IdentityAlignmentChecker
-                self._alignment_checker = IdentityAlignmentChecker(hardcoded_store)
+                correlation_store = None
+                try:
+                    identity_ns = getattr(memory, "identity", None)
+                    if identity_ns is not None:
+                        correlation_store = getattr(identity_ns, "correlation", None)
+                except Exception:
+                    pass
+                self._alignment_checker = IdentityAlignmentChecker(
+                    hardcoded_store,
+                    correlation_store=correlation_store,
+                )
             except Exception:
                 log.warning("IdentityAlignmentChecker could not be initialized.")
 
