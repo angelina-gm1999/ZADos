@@ -17,6 +17,7 @@ from zados.memory.long_term.identity.core_memories.store import CoreMemoryStore
 from zados.memory.long_term.identity.core_memories.pending.queue import PendingUpdateQueue
 from zados.memory.long_term.identity.development.conclusions import IdentityConclusionStore
 from zados.memory.long_term.identity.development.identity_journal.store import IdentityJournalStore
+from zados.memory.long_term.identity.correlation.store import IdentityCorrelationStore
 
 from zados.memory.long_term.thoughts.overview_logs.store import OverviewLogStore
 from zados.memory.long_term.thoughts.held_thinking_blocks.store import HeldThinkingBlockStore
@@ -35,11 +36,12 @@ from zados.memory.long_term.knowledge.notebook.store import NotebookStore
 @dataclass
 class IdentityNamespace:
     """Facade for identity/ sub-stores."""
-    hardcoded:    HardcodedStore           = field(default_factory=HardcodedStore)
-    core:         CoreMemoryStore          = field(default_factory=CoreMemoryStore)
-    pending:      PendingUpdateQueue       = field(default_factory=PendingUpdateQueue)
-    conclusions:  IdentityConclusionStore  = field(default_factory=IdentityConclusionStore)
-    journal:      IdentityJournalStore     = field(default_factory=IdentityJournalStore)
+    hardcoded:    HardcodedStore              = field(default_factory=HardcodedStore)
+    core:         CoreMemoryStore             = field(default_factory=CoreMemoryStore)
+    pending:      PendingUpdateQueue          = field(default_factory=PendingUpdateQueue)
+    conclusions:  IdentityConclusionStore     = field(default_factory=IdentityConclusionStore)
+    journal:      IdentityJournalStore        = field(default_factory=IdentityJournalStore)
+    correlation:  IdentityCorrelationStore    = field(default_factory=IdentityCorrelationStore)
 
 
 @dataclass
