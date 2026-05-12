@@ -373,20 +373,42 @@ class ReflectivePipeline:
             try:
                 for h in hardcoded_store.get_all():
                     data["hardcoded"].append({
+                        "entry_id": getattr(h, "entry_id", ""),
                         "content": getattr(h, "content", str(h)),
+                        "category": getattr(h, "category", ""),
                         "tags": getattr(h, "tags", []),
                     })
             except Exception as e:
                 log.debug("Failed to read hardcoded identity: %s", e)
 
+        # Identity correlations (fixed ↔ developmental mappings)
+        data["correlations"] = []
+        correlation_store = getattr(identity, "correlation", None)
+        if correlation_store is not None:
+            try:
+                for c in correlation_store.get_all():
+                    data["correlations"].append({
+                        "correlation_id": c.correlation_id,
+                        "hardcoded_entry_id": c.hardcoded_entry_id,
+                        "developmental_id": c.developmental_id,
+                        "developmental_type": c.developmental_type,
+                        "relation_type": c.relation_type,
+                        "description": c.description,
+                        "confidence": c.confidence,
+                        "validation_count": c.validation_count,
+                    })
+            except Exception as e:
+                log.debug("Failed to read identity correlations: %s", e)
+
         log.debug(
             "Phase 0: Identity data — %d core, %d conclusions, "
-            "%d journal, %d pending, %d hardcoded.",
+            "%d journal, %d pending, %d hardcoded, %d correlations.",
             len(data["core_memories"]),
             len(data["conclusions"]),
             len(data["journal_entries"]),
             len(data["pending_updates"]),
             len(data["hardcoded"]),
+            len(data["correlations"]),
         )
         return data
 
@@ -753,12 +775,25 @@ class ReflectivePipeline:
         coherence_status = e32_result.get("identity_coherence_status", "coherent")
         self._update_cortical_coherence(session, coherence_status)
 
+        # 4f: Create/update identity correlations (fixed ↔ developmental)
+        if identity is not None:
+            correlation_store = getattr(identity, "correlation", None)
+            hardcoded_store = getattr(identity, "hardcoded", None)
+            conclusion_store_for_corr = getattr(identity, "conclusions", None)
+            if correlation_store is not None and hardcoded_store is not None:
+                stats["correlations_created"] = self._update_correlations(
+                    e32_result, cross_refs,
+                    correlation_store, hardcoded_store, conclusion_store_for_corr,
+                )
+
         log.debug(
-            "Phase 4: reinforced=%d, created=%d, recommended=%d, journal=%d.",
+            "Phase 4: reinforced=%d, created=%d, recommended=%d, journal=%d, "
+            "correlations=%d.",
             stats["conclusions_reinforced"],
             stats["conclusions_created"],
             stats["conclusions_recommended_for_update"],
             stats["journal_entries_created"],
+            stats.get("correlations_created", 0),
         )
         return stats
 
@@ -1113,6 +1148,186 @@ class ReflectivePipeline:
                 f"[reflective_mode] Identity coherence changed: "
                 f"{old_status} → {coherence_status}"
             )
+
+    # ==================================================================
+    # Phase 4f — Identity Correlation Updates
+    # ==================================================================
+
+    def _update_correlations(
+        self,
+        e32_result: Dict[str, Any],
+        cross_refs: List[Dict[str, Any]],
+        correlation_store: Any,
+        hardcoded_store: Any,
+        conclusion_store: Any,
+    ) -> int:
+        """Create identity correlations between hardcoded and developmental entries.
+
+        Scans E32 alignment analysis and cross-references for connections
+        between fixed identity (hardcoded entries) and developmental identity
+        (conclusions, core memories).  Creates IdentityCorrelation records
+        for each detected relationship.
+
+        Returns number of correlations created.
+        """
+        created = 0
+
+        try:
+            from zados.memory.long_term.identity.types import IdentityCorrelation
+        except ImportError:
+            return 0
+
+        if conclusion_store is None:
+            return 0
+
+        # Get all hardcoded entries for keyword matching
+        all_hardcoded = hardcoded_store.get_all()
+        if not all_hardcoded:
+            return 0
+
+        # Get all conclusions
+        try:
+            all_conclusions = conclusion_store.get_all()
+        except Exception:
+            return 0
+
+        # Match conclusions against hardcoded entries by tag/keyword overlap
+        for conclusion in all_conclusions:
+            c_text = conclusion.content.lower()
+            c_tags = set(conclusion.tags)
+
+            for hc_entry in all_hardcoded:
+                hc_tags = set(hc_entry.tags)
+                hc_text = hc_entry.content.lower()
+                hc_id = hc_entry.entry_id
+
+                # Check if correlation already exists
+                existing = correlation_store.get_by_hardcoded(hc_id)
+                already_linked = any(
+                    c.developmental_id == conclusion.conclusion_id
+                    for c in existing
+                )
+                if already_linked:
+                    # Re-validate existing correlation
+                    for c in existing:
+                        if c.developmental_id == conclusion.conclusion_id:
+                            correlation_store.validate(c.correlation_id)
+                    continue
+
+                # Determine relation by overlap
+                tag_overlap = c_tags & hc_tags
+                if len(tag_overlap) < 2:
+                    # Also check keyword overlap in content
+                    c_words = set(c_text.split())
+                    hc_words = set(hc_text.split())
+                    # Remove common stop words
+                    stop = {"the", "a", "an", "is", "are", "was", "were", "be",
+                            "been", "being", "have", "has", "had", "do", "does",
+                            "did", "will", "would", "could", "should", "may",
+                            "might", "shall", "can", "need", "dare", "ought",
+                            "used", "to", "of", "in", "for", "on", "with", "at",
+                            "by", "from", "as", "into", "through", "during",
+                            "before", "after", "above", "below", "between",
+                            "out", "off", "over", "under", "again", "further",
+                            "then", "once", "and", "but", "or", "nor", "not",
+                            "so", "yet", "both", "either", "neither", "each",
+                            "every", "all", "any", "few", "more", "most",
+                            "other", "some", "such", "no", "only", "own",
+                            "same", "than", "too", "very", "just", "because",
+                            "it", "its", "my", "i", "me", "we", "our", "that",
+                            "this", "these", "those", "what", "which", "who",
+                            "whom", "whose", "when", "where", "how", "why"}
+                    c_words -= stop
+                    hc_words -= stop
+                    word_overlap = c_words & hc_words
+                    if len(word_overlap) < 3:
+                        continue
+                    overlap_terms = word_overlap
+                else:
+                    overlap_terms = tag_overlap
+
+                # Determine relation type
+                relation_type = self._infer_relation_type(
+                    conclusion, hc_entry, overlap_terms,
+                )
+
+                corr = IdentityCorrelation(
+                    hardcoded_entry_id=hc_id,
+                    developmental_id=conclusion.conclusion_id,
+                    developmental_type="conclusion",
+                    relation_type=relation_type,
+                    description=(
+                        f"Conclusion '{conclusion.content[:80]}' "
+                        f"{relation_type} hardcoded '{hc_id}' "
+                        f"(overlap: {', '.join(list(overlap_terms)[:5])})"
+                    ),
+                    confidence=min(0.5 + len(overlap_terms) * 0.05, 0.9),
+                    tags=list(overlap_terms)[:10],
+                )
+                try:
+                    correlation_store.write(corr)
+                    created += 1
+                except Exception:
+                    log.debug("Failed to write correlation for %s ↔ %s",
+                              hc_id, conclusion.conclusion_id)
+
+        # From cross-references: identity tensions → tensions_with correlations
+        for xref in cross_refs:
+            if xref.get("type") == "failure_vs_identity" and xref.get("conclusion_id"):
+                conclusion_id = xref["conclusion_id"]
+                # Find best matching hardcoded entry by failure type
+                failure_type = xref.get("failure_type", "")
+                best_hc = None
+                for hc in all_hardcoded:
+                    if failure_type.lower() in hc.content.lower():
+                        best_hc = hc
+                        break
+                if best_hc is None:
+                    continue
+
+                corr = IdentityCorrelation(
+                    hardcoded_entry_id=best_hc.entry_id,
+                    developmental_id=conclusion_id,
+                    developmental_type="conclusion",
+                    relation_type="tensions_with",
+                    description=(
+                        f"Learning failure '{failure_type}' creates tension "
+                        f"between developmental conclusion and hardcoded "
+                        f"'{best_hc.entry_id}'"
+                    ),
+                    confidence=0.6 if xref.get("severity") == "high" else 0.4,
+                    tags=["reflective_mode", "identity_tension", failure_type],
+                )
+                try:
+                    correlation_store.write(corr)
+                    created += 1
+                except Exception:
+                    pass
+
+        log.debug("Phase 4f: Created %d identity correlations.", created)
+        return created
+
+    @staticmethod
+    def _infer_relation_type(
+        conclusion: Any,
+        hc_entry: Any,
+        overlap_terms: set,
+    ) -> str:
+        """Infer the relation type between a conclusion and hardcoded entry."""
+        c_type = getattr(conclusion, "conclusion_type", "")
+        hc_category = getattr(hc_entry, "category", "")
+
+        if c_type == "lesson":
+            return "extends"
+        if c_type == "self_insight":
+            return "deepens"
+        if c_type == "value" and hc_category in ("core_value", "value", "axiom"):
+            return "instantiates"
+        if c_type == "boundary":
+            return "supports"
+        if "tension" in " ".join(overlap_terms).lower():
+            return "tensions_with"
+        return "supports"
 
     # ==================================================================
     # Phase 5 — Output & Summary
