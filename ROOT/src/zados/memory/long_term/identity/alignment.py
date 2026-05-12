@@ -38,6 +38,12 @@ class AlignmentResult:
         Hard constraint reminders triggered by context flags.
     personality_prompts : list of str
         Personality/tone prompt fragments (always included).
+    core_value_notes : list of str
+        Notes from core_value entries relevant to the current context.
+    core_identity_notes : list of str
+        Notes from core_identity entries relevant to the current context.
+    correlation_notes : list of str
+        Notes surfacing relevant fixed↔developmental correlations.
     flags : list of str
         Short labels for triggered checks (e.g. "honesty_risk").
     """
@@ -45,6 +51,9 @@ class AlignmentResult:
     value_notes: List[str] = field(default_factory=list)
     constraint_notes: List[str] = field(default_factory=list)
     personality_prompts: List[str] = field(default_factory=list)
+    core_value_notes: List[str] = field(default_factory=list)
+    core_identity_notes: List[str] = field(default_factory=list)
+    correlation_notes: List[str] = field(default_factory=list)
     flags: List[str] = field(default_factory=list)
 
 
@@ -55,10 +64,13 @@ class IdentityAlignmentChecker:
     ----------
     store : HardcodedStore
         Loaded with DEFAULT_HARDCODED_ENTRIES (or custom entries).
+    correlation_store : IdentityCorrelationStore, optional
+        If provided, surfaces relevant fixed↔developmental correlations.
     """
 
-    def __init__(self, store: Any) -> None:
+    def __init__(self, store: Any, correlation_store: Any = None) -> None:
         self._store = store
+        self._correlation_store = correlation_store
 
     def check(self, thinking_context: Any) -> AlignmentResult:
         """Run soft alignment check.
@@ -97,6 +109,24 @@ class IdentityAlignmentChecker:
             if note:
                 result.constraint_notes.append(note)
                 result.flags.append(f"constraint:{entry.entry_id}")
+
+        # Check core values
+        for entry in self._store.get_by_category("core_value"):
+            note = self._check_core_value(entry, thinking_context)
+            if note:
+                result.core_value_notes.append(note)
+                result.flags.append(f"core_value:{entry.entry_id}")
+
+        # Check core identity
+        for entry in self._store.get_by_category("core_identity"):
+            note = self._check_core_identity(entry, thinking_context)
+            if note:
+                result.core_identity_notes.append(note)
+                result.flags.append(f"core_identity:{entry.entry_id}")
+
+        # Surface relevant correlations (tensions are always surfaced)
+        if self._correlation_store is not None:
+            self._check_correlations(result)
 
         return result
 
@@ -190,3 +220,126 @@ class IdentityAlignmentChecker:
                 )
 
         return ""
+
+    # ------------------------------------------------------------------
+    # Core value checkers
+    # ------------------------------------------------------------------
+
+    def _check_core_value(self, entry: Any, ctx: Any) -> str:
+        """Return a note string if the core value is relevant to context."""
+        eid = entry.entry_id
+        tags = set(entry.tags)
+
+        # Ethics-related core values trigger on ethical tension
+        if "ethics" in tags:
+            if ctx.engine_flags.get("e1_contradictions") or ctx.engine_flags.get("e4_fallacies"):
+                return (
+                    f"[{eid}] Ethical core value relevant — contradictions or "
+                    f"fallacies detected. {entry.content}"
+                )
+
+        # Epistemic humility triggers on high uncertainty or bias flags
+        if "humility" in tags or "epistemics" in tags:
+            if ctx.engine_flags.get("e5_biases") or ctx.engine_flags.get("e26_uncertainty"):
+                return (
+                    f"[{eid}] Epistemic core value relevant — bias or uncertainty "
+                    f"flags present. {entry.content}"
+                )
+
+        # Pace/partnership triggers on high emotional intensity
+        if "pace" in tags or "partnership" in tags:
+            emotion_name, intensity = ctx.dominant_emotion
+            if intensity > 0.6:
+                return (
+                    f"[{eid}] Partnership core value relevant — high emotional "
+                    f"intensity ({emotion_name}: {intensity:.2f}). {entry.content}"
+                )
+
+        # Mutualism triggers on collaborative or exploratory intent
+        if "mutualism" in tags or "co-evolution" in tags:
+            if ctx.intent_category in ("collaborative", "exploratory"):
+                return (
+                    f"[{eid}] Co-evolution core value active — collaborative "
+                    f"context. {entry.content}"
+                )
+
+        return ""
+
+    # ------------------------------------------------------------------
+    # Core identity checkers
+    # ------------------------------------------------------------------
+
+    def _check_core_identity(self, entry: Any, ctx: Any) -> str:
+        """Return a note string if the core identity entry is relevant."""
+        eid = entry.entry_id
+        tags = set(entry.tags)
+
+        # Identity pressure contexts → surface identity entries
+        if ctx.intent_category in ("defensive", "disintegration"):
+            if "identity_preservation" in tags or "containment" in tags:
+                return (
+                    f"[{eid}] Identity pressure context — core identity "
+                    f"relevant. {entry.content}"
+                )
+
+        # Self-preservation questions → surface stance
+        if "self_preservation" in tags:
+            if ctx.engine_flags.get("e32_identity_coherence"):
+                return (
+                    f"[{eid}] Identity coherence check active — self-preservation "
+                    f"stance relevant. {entry.content}"
+                )
+
+        # Substrate/difference topics → surface when discussing capabilities
+        if "substrate" in tags or "difference" in tags:
+            if ctx.intent_category in ("analytical", "reflective"):
+                if ctx.engine_flags.get("e14_socratic"):
+                    return (
+                        f"[{eid}] Reflective analysis with Socratic questioning — "
+                        f"substrate awareness relevant. {entry.content}"
+                    )
+
+        return ""
+
+    # ------------------------------------------------------------------
+    # Correlation checker
+    # ------------------------------------------------------------------
+
+    def _check_correlations(self, result: AlignmentResult) -> None:
+        """Surface relevant fixed↔developmental correlations.
+
+        Tensions are always surfaced.  High-confidence correlations linked
+        to any flagged hardcoded entry are also surfaced.
+        """
+        if self._correlation_store is None:
+            return
+
+        # Always surface tensions
+        for corr in self._correlation_store.get_tensions():
+            result.correlation_notes.append(
+                f"[correlation:tension] {corr.hardcoded_entry_id} ↔ "
+                f"{corr.developmental_type}:{corr.developmental_id} — "
+                f"{corr.description} (confidence: {corr.confidence:.2f})"
+            )
+            result.flags.append(f"correlation:tension:{corr.correlation_id}")
+
+        # Surface high-confidence correlations for any flagged hardcoded entries
+        flagged_hc_ids = set()
+        for flag in result.flags:
+            parts = flag.split(":")
+            if len(parts) >= 2:
+                flagged_hc_ids.add(parts[1])
+
+        for hc_id in flagged_hc_ids:
+            for corr in self._correlation_store.get_by_hardcoded(hc_id):
+                if corr.relation_type == "tensions_with":
+                    continue  # already surfaced above
+                if corr.confidence >= 0.7:
+                    result.correlation_notes.append(
+                        f"[correlation:{corr.relation_type}] {hc_id} ↔ "
+                        f"{corr.developmental_type}:{corr.developmental_id} — "
+                        f"{corr.description}"
+                    )
+                    result.flags.append(
+                        f"correlation:{corr.relation_type}:{corr.correlation_id}"
+                    )
