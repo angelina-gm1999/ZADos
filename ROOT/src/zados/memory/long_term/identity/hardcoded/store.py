@@ -55,5 +55,36 @@ class HardcodedStore:
     def get_by_category(self, category: str) -> List[HardcodedEntry]:
         return [e for e in self._storage.values() if e.category == category]
 
+    def get_by_tags(
+        self,
+        tags: List[str],
+        match_all: bool = False,
+    ) -> List[HardcodedEntry]:
+        """Return entries matching the given tags.
+
+        Parameters
+        ----------
+        tags : list of str
+            Tags to match against.
+        match_all : bool
+            If True, entry must contain ALL given tags.
+            If False (default), entry must contain ANY given tag.
+        """
+        tag_set = set(tags)
+        results: List[HardcodedEntry] = []
+        for e in self._storage.values():
+            entry_tags = set(e.tags)
+            if match_all:
+                if tag_set.issubset(entry_tags):
+                    results.append(e)
+            else:
+                if tag_set & entry_tags:
+                    results.append(e)
+        return results
+
+    def get_categories(self) -> List[str]:
+        """Return sorted list of unique categories present in the store."""
+        return sorted({e.category for e in self._storage.values()})
+
     def __len__(self) -> int:
         return len(self._storage)
