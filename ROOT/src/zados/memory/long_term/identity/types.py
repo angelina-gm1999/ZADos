@@ -72,6 +72,47 @@ class IdentityConclusion:
 
 # ── Identity Journal ─────────────────────────────────────────────────────
 
+# ── Identity Correlations ────────────────────────────────────────────
+
+class CorrelationRelationType(str, Enum):
+    """How a developmental identity element relates to a hardcoded entry."""
+    INSTANTIATES = "instantiates"   # developmental item is a concrete instance of hardcoded principle
+    EXTENDS      = "extends"        # developmental item builds on hardcoded principle
+    SUPPORTS     = "supports"       # developmental item provides evidence for hardcoded principle
+    DEEPENS      = "deepens"        # developmental item deepens understanding of hardcoded principle
+    TENSIONS     = "tensions_with"  # developmental item has productive tension with hardcoded principle
+    QUESTIONS    = "questions"      # developmental item raises questions about hardcoded principle
+
+
+@dataclass
+class IdentityCorrelation:
+    """
+    Maps a relation between a fixed (hardcoded) identity entry and a
+    developmental identity element (conclusion, core memory, or journal entry).
+
+    ZADOS cannot modify or delete hardcoded entries.  It can only create,
+    update, or remove correlations that describe how its developmental
+    identity relates to its fixed foundations.
+    """
+    correlation_id:     str            = field(default_factory=lambda: str(uuid.uuid4()))
+    hardcoded_entry_id: str            = ""
+    developmental_id:   str            = ""
+    developmental_type: str            = ""  # "conclusion" | "core_memory" | "journal_entry"
+    relation_type:      str            = ""  # CorrelationRelationType value
+    description:        str            = ""  # AI-generated description of the relation
+    confidence:         float          = 0.5
+    tags:               List[str]      = field(default_factory=list)
+    created_at:         datetime       = field(default_factory=datetime.utcnow)
+    last_validated:     datetime       = field(default_factory=datetime.utcnow)
+    validation_count:   int            = 0
+
+    def to_search_text(self) -> str:
+        parts = [self.description, self.relation_type,
+                 self.developmental_type, self.hardcoded_entry_id]
+        parts.extend(self.tags)
+        return " ".join(parts)
+
+
 class IdentityJournalEntryType(str, Enum):
     REGULAR    = "regular"     # standard reflective journal entry
     REFLECTION = "reflection"  # triggered by reflective mode pipeline
