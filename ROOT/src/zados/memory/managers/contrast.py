@@ -32,6 +32,7 @@ _FOLDER_ATTR_MAP: Dict[str, Tuple[str, str]] = {
     "identity/core":                 ("identity", "core"),
     "identity/conclusions":          ("identity", "conclusions"),
     "identity/journal":              ("identity", "journal"),
+    "identity/correlation":          ("identity", "correlation"),
     "thoughts/overview_logs":        ("thoughts", "overview_logs"),
     "thoughts/held_blocks":          ("thoughts", "held_blocks"),
     "thoughts/unsolved_buffer":      ("thoughts", "unsolved_buffer"),
