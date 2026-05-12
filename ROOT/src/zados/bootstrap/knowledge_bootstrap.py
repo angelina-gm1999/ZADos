@@ -118,8 +118,9 @@ class KnowledgeBootstrap:
     @staticmethod
     def _seed_library(memory: Any) -> int:
         from zados.bootstrap.seeds.library_seed import make_seed_library_entries
+        from zados.bootstrap.seeds.identity_library_seed import make_identity_library_entries
         store = memory.knowledge.library
-        entries = make_seed_library_entries()
+        entries = make_seed_library_entries() + make_identity_library_entries()
         for entry in entries:
             store.write(entry)
         return len(entries)
