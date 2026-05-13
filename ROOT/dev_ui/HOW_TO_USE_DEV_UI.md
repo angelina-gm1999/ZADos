@@ -5,6 +5,9 @@ A terminal-based Python REPL for interacting with the ZADOS backend without a fu
 ---
 
 ## Quick Start
+**# Install from https://ollama.com  then:
+ollama pull llama3.1
+ollama serve        # starts on localhost:11434
 
 ```bash
 cd ROOT
