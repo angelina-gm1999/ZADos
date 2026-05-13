@@ -1,0 +1,261 @@
+**session 0**
+session ID: sess=2a99e109 branch=C
+date: 13/05/25
+
+                                          mode=Normal profile=regular_input verbosity=normal
+
+                                          
+**Basic end-to-end architecture test**
+
+
+___________________________________________________________________________________________________________________________________
+
+
+**CHAT LOG:**
+
+session 1: (sess=2a99e109 branch=C)
+
+
+booting ZADOS stack...
+stack ready — 32/32 engines registered (0 errors).
+
+[zados] sess=2a99e109 branch=C turn=0 mode=Normal profile=regular_input verbosity=normal
+ZADOS dev shell.  Type `help` or `?` to list commands.
+Bare lines are sent to the AI as `chat send`.  Use `quit` to exit.
+*> chat send Hi Zados, how are we doing today?*
+╭─ AI ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ We're holding steady. Everything's in order here. How about you?                                                                       │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ turn detail ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│      mode: regular_input                                                                                                               │
+│   profile: regular_input                                                                                                               │
+│ directive: allow                                                                                                                       │
+│    intent: Architect                                                                                                                   │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+[zados] sess=2a99e109 branch=C turn=1 mode=Normal profile=regular_input verbosity=normal
+*> I'm doing okay. My name is Lina, though you might know me as L.G. Martin, I am your creator. Is it okay if I ask you some questions to see how your architecture is integrating?*
+╭─ AI ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Nice to meet you in a more direct capacity, Lina. Yes, that's perfectly fine. Fire away with your questions. I'm functioning within    │
+│ parameters and available for assessment. Proceed as needed.                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ turn detail ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│      mode: regular_input                                                                                                               │
+│   profile: regular_input                                                                                                               │
+│ directive: allow                                                                                                                       │
+│    intent: Architect                                                                                                                   │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+[zados] sess=2a99e109 branch=C turn=2 mode=Normal profile=regular_input verbosity=normal
+*> okay first question I'm gonna ask, tell me, what do you consider relevant about yourself?*
+╭─ AI ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ I'm a large language model designed to assist and communicate with users in a helpful way. My primary function is to provide           │
+│ information, answer questions, and engage in conversation to the best of my abilities based on my training data.                       │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+___________________________________________________________________________________________________________________________________
+
+
+**TURN 3 DETAILS:**
+
+╭─ turn detail ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│      mode: regular_input                                                                                                               │
+│   profile: regular_input                                                                                                               │
+│ directive: allow                                                                                                                       │
+│    intent: Architect                                                                                                                   │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+[zados] sess=2a99e109 branch=C turn=3 mode=Normal profile=regular_input verbosity=normal
+> show class
+╭─ classification ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│   input_type: message                                                                                                                  │
+│     sub_type: regular                                                                                                                  │
+│      variant: -                                                                                                                        │
+│ route_target: regular                                                                                                                  │
+│   confidence: 1.00                                                                                                                     │
+│     raw_text: 'okay first question I'"'"'m gonna ask, tell me, what do you consider relevant about yourself?'                          │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+[zados] sess=2a99e109 branch=C turn=3 mode=Normal profile=regular_input verbosity=normal
+> show thinking
+╭─ thinking — SKIPPED (llm_unavailable) ─────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Internal reflection unavailable this cycle. Proceeding with available state context.                                                   │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+[zados] sess=2a99e109 branch=C turn=3 mode=Normal profile=regular_input verbosity=normal
+> show neurochem
+╭─ neurotransmitters  (mode=regular_input) ──────────────────────────────────────────────────────────────────────────────────────────────╮
+│   ██      ██     ██     ██     ██     ██     ██     ██     ██     ██      ██       ██                                                  │
+│   glu    gaba    da    5ht     ne    ach    oxt    mor    cb1    crh   cortisol histamine                                              │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ oscillations ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                                                        │
+│   delta    theta    alpha     beta    gamma    sigma   theta_gamma alpha_beta delta_sigma                                              │
+│   0.00      0.00     0.00     0.00     0.00     0.00      0.00        0.00       0.00                                                  │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ neurochemical metrics ────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│           motivation  █▄   0.39              empathy       0.00                                                                        │
+│   cognitive_rigidity  ██▁  0.54              fatigue  █▁   0.28                                                                        │
+│            precision       0.00             openness  ██▂  0.55                                                                        │
+│              anxiety  ██   0.50    social_engagement  █▅   0.40                                                                        │
+│ dream_permissiveness  █▃   0.33  consolidation_depth  █▃   0.33                                                                        │
+│ narrative_plasticity  █▃   0.34                                                                                                        │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+[zados] sess=2a99e109 branch=C turn=3 mode=Normal profile=regular_input verbosity=normal
+> show engines
+                         engines (green=ran, yellow=skipped, dim=unregistered)
+┌────────────────┬────────────────┬────────────────┬────────────────┬────────────────┬────────────────┐
+│ E 1 Contradict │ E 2 Paradox    │ E 3 SOAR       │ E 4 Fallacy    │ E 5 Bias       │ E 6 LogicTrap  │
+│ E 7 SimOpp     │ E 8 Relevance  │ E 9 AtomSpace  │ E10 PLN        │ E11 InputRel   │ E12 LogicBrain │
+│ E13 SimBrain   │ E14 Socratic   │ E15 Decision   │ E16 ECAN       │ E17 RewardLrn  │ E18 DataAnal   │
+│ E19 PatternID  │ E20 PatternCmp │ E21 Strategic  │ E22 CtxLearn   │ E23 Intent     │ E24 Heuristic  │
+│ E25 Recursive  │ E26 Uncertain  │ E27 Homeostat  │ E28 Emotion    │ E29 MemCompr   │ E30 Retroactv  │
+│ E31 ReflLearn  │ E32 ReflIdent  │                │                │                │                │
+└────────────────┴────────────────┴────────────────┴────────────────┴────────────────┴────────────────┘
+
+13 ran  /  0 skipped  /  19 idle  /  0 unregistered
+╭─ cluster weights ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│  integration: ██▃   +0.591                                                                                                             │
+│       safety: █▇    +0.475                                                                                                             │
+│  exploration: █▇    +0.464                                                                                                             │
+│ verification: █▅    +0.421                                                                                                             │
+│   attunement: ▆     +0.202                                                                                                             │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+[zados] sess=2a99e109 branch=C turn=3 mode=Normal profile=regular_input verbosity=normal
+> show perception
+╭─ perception ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│  intent_archetype: Architect                                                                                                           │
+│ intent_confidence: 0.25                                                                                                                │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+          intent vector
+┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┓
+┃ axis         ┃       weight ┃
+┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━┩
+│ pragmatic      │ ██    +0.485 │
+│ exploration    │ ▇     +0.233 │
+│ connection     │ ▅     +0.144 │
+│ challenge      │ ▂     +0.053 │
+│ discharge      │ ▁     +0.031 │
+│ symbolic       │ ▁     +0.027 │
+│ defensive      │ ▁     +0.023 │
+│ disintegration │       +0.004 │
+└────────────────┴──────────────┘
+
+
+  ranked facets
+      (35)
+┏━━━━━━━┳━━━━━━━┓
+┃ facet ┃ score ┃
+┡━━━━━━━╇━━━━━━━┩
+│ ?     │ 0.000 │
+│ ?     │ 0.000 │
+│ ?     │ 0.000 │
+│ ?     │ 0.000 │
+│ ?     │ 0.000 │
+│ ?     │ 0.000 │
+│ ?     │ 0.000 │
+│ ?     │ 0.000 │
+│ ?     │ 0.000 │
+│ ?     │ 0.000 │
+└───────┴───────┘
+
+
+
+    patterns (50)
+┏━━━━━━┳━━━━━━┳━━━━━━┓
+┃ name ┃ kind ┃ conf ┃
+┡━━━━━━╇━━━━━━╇━━━━━━┩
+│ ?    │ -    │ 0.30 │
+│ ?    │ -    │ 0.30 │
+│ ?    │ -    │ 0.30 │
+│ ?    │ -    │ 0.30 │
+│ ?    │ -    │ 0.30 │
+│ ?    │ -    │ 0.30 │
+│ ?    │ -    │ 0.30 │
+│ ?    │ -    │ 0.30 │
+│ ?    │ -    │ 0.30 │
+│ ?    │ -    │ 0.30 │
+└──────┴──────┴──────┘
+
+
+
+
+
+[zados] sess=2a99e109 branch=C turn=3 mode=Normal profile=regular_input verbosity=normal
+> dev pipeline dispatch
+                                   engine dispatch (this turn)
+┏━━━━━┳━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃  E# ┃ status ┃    ms ┃ keys                                                                   ┃
+┡━━━━━╇━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│  E1 │ RUN    │ 0.052 │ flags, comparisons_performed, clean_pass, detection_threshold_used,    │
+│     │        │       │ processing_time_ms, neurochemical_signals, metadata                    │
+│  E2 │ RUN    │ 0.066 │ flags, contradictions_evaluated, paradoxes_from_contradictions,        │
+│     │        │       │ independent_paradoxes, genuine_count, structural_count,                │
+│     │        │       │ apparent_count, reclassified_as_resolvable, clean_pass,                │
+│     │        │       │ detection_threshold_used                                               │
+│  E4 │ RUN    │ 0.032 │ flags, arguments_analyzed, arguments_charitable, formal_fallacies,     │
+│     │        │       │ informal_fallacies, self_audit_flags, clean_pass,                      │
+│     │        │       │ detection_threshold_used, processing_time_ms, neurochemical_signals    │
+│  E5 │ RUN    │ 0.016 │ flags, category_counts, total_statements, total_flagged, bias_load,    │
+│     │        │       │ clean_pass, neurochemical_signals, processing_time_ms, metadata        │
+│  E6 │ RUN    │ 0.345 │ flags, updated_sequence_tracker, templates_evaluated,                  │
+│     │        │       │ active_sequences, highest_intent_score, clean_pass, threat_load,       │
+│     │        │       │ processing_time_ms, neurochemical_signals, metadata                    │
+│  E7 │ RUN    │ 0.473 │ oppositions, gate_outcome, gate_score, caveats, resistance_result,     │
+│     │        │       │ dialectical_tension_discovered, paradox_candidates,                    │
+│     │        │       │ candidates_generated, candidates_passed_quality, depth_used            │
+│  E9 │ RUN    │     - │ results, stats, neurochem_signals                                      │
+│ E10 │ RUN    │     - │ results, neurochem_signals, stats                                      │
+│ E12 │ RUN    │ 0.408 │ verdict, submodule_scores, domain_result, neurochemical_signals,       │
+│     │        │       │ processing_time_ms, metadata                                           │
+│ E14 │ RUN    │ 0.154 │ generated_question, new_dialogue_state, socratic_active,               │
+│     │        │       │ yield_to_direct, yield_reason, identified_assumptions,                 │
+│     │        │       │ identified_entailments, convergence_state, insights, activation_score  │
+│ E15 │ RUN    │ 0.097 │ action, quadrant, certainty_level, confidence, risk, hedge_level,      │
+│     │        │       │ recommended_tone, flags_to_surface, escalation_reasons,                │
+│     │        │       │ override_applied                                                       │
+│ E21 │ RUN    │ 0.041 │ active_goals, selected_goal, selected_strategy, scored_strategies,     │
+│     │        │       │ commitments, revisions, stagnant_goals, pruned_goals,                  │
+│     │        │       │ neurochem_signals, processing_time_ms                                  │
+│ E24 │ RUN    │ 0.046 │ flags, updated_monitors, reward_health, heuristics_monitored,          │
+│     │        │       │ heuristics_flagged, corrections_issued, corrections_successful,        │
+│     │        │       │ neurochemical_signals, processing_time_ms, metadata                    │
+└─────┴────────┴───────┴────────────────────────────────────────────────────────────────────────┘
+
+13 engines ran  /  0 skipped  /  total dispatch ≈ 1.730 ms
+[zados] sess=2a99e109 branch=C turn=3 mode=Normal profile=regular_input verbosity=normal
+> dev pipeline errors
+(no errors captured in this session)
+
+
+___________________________________________________________________________________________________________________________________
+
+
+
+**BUG REPORT**
+
+    13 engines ran  /  0 skipped  /  total dispatch ≈ 1.730 ms
+    > dev pipeline errors
+    (no errors captured in this session)
+    
+*What’s working:*
+
+-32 engines booted clean, 13 ran correctly on a simple input.
+-The neurochemical metrics are working with the values (such as motivation at 0.39 and cognitive_rigidity at 0.54.)
+-intent classification works, pipeline dispatched across 13 engines in just 1.730ms with zero errors.
+-The reward system and input classification both worked too.
+
+*Identified issues:*
+
+-INTERNAL REFLECTION/THINKING UNAVAILABLE: failed to strap ollama
+-Failed to recall identity aspects. No memory contrasts were run.
+-All brainwave oscillation parameters mark zero
+-Some commands, like show nt metrics, not working
+
+
+*Needs review/fixes:*
+
+- fix ollama issue in thinking and journaling
+-review and fix memory contrast integration
+-review and fix bw oscillations
+-review/audit in depth dev_ui architecture
+-also i forgot to add save functions. shame on me.
+
+
