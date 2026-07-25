@@ -1,4 +1,4 @@
-Coming soon: ZADos Lite
+Coming soon: **ZADos Lite**
 
 A subsystem for reaching into how the LLM generates, without modifying weights or retraining anything. Six points of contact: prompt construction, logit biasing, sampling, KV-cache read/write, logprob capture, soft-prompt injection.
 
