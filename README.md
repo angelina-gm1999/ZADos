@@ -1,5 +1,8 @@
 # ZADos
 A model-agnostic, bio-inspired Cognitive Architecture for Artificial Intelligence Systems
+Total files: 597
+6777 tests passing (full repo)
+29 Cognitive Engines + E33 LexicalSalience + E34 ContextDrift + CogniTools (AtomSpace/PLN/ECAN substitutes) + Memory Layer (STMM/MTMM/LTMM) + Neurochemical Core + Reward System + Sleep/Dream Neurochemistry + Session Orchestration + Self-Reflective Sub-Type Dispatch + Proactive AI-Initiated Reflection + OU-Modeled Drift Dynamics + Contextual Learning Loop
 
 ZADOS — Zonal Adaptive Dynamic Operating System
 =================================================
