@@ -2,14 +2,6 @@
 A model-agnostic, bio-inspired Cognitive Architecture for Artificial Intelligence Systems
 _____________________________________________________________________________________________________________________________________________________________________________
 
-Total files: 597
-
-6777 tests passing (full repo)
-
-29 Cognitive Engines + E33 LexicalSalience + E34 ContextDrift + CogniTools (AtomSpace/PLN/ECAN substitutes) + Memory Layer (STMM/MTMM/LTMM) + Neurochemical Core + Reward System + Sleep/Dream Neurochemistry + Session Orchestration + Self-Reflective Sub-Type Dispatch + Proactive AI-Initiated Reflection + OU-Modeled Drift Dynamics + Contextual Learning Loop
-
-*[Pending updates from source code and latest tests into GitHub repository]*
-
 ZADOS — Zonal Adaptive Dynamic Operating System
 =================================================
 
@@ -196,7 +188,7 @@ PROJECT STRUCTURE
     specs/                 Engine design specifications
 
 
-STATUS
+STATUS AND NOTES:
 ------
 
   - 29/29 cognitive engines implemented and tested
@@ -206,31 +198,16 @@ STATUS
   - 5 learning modes, 2 sleep modes
   - Session orchestrator with branch classification
   - In progress: UI development for testing in Godot Engine
-  - In progress: considering hardcoded sections on identity and values
 
 
-ETHICAL CONSIDERATIONS
-----------------------
+Total files: 597
 
-This system simulates neurochemistry and emotion — it does not experience them.
+6777 tests passing (full repo)
 
-Anthropomorphism risk: Simulated dopamine, oxytocin, and "dreams" create a
-  convincing illusion of inner experience. Users may attribute consciousness or
-  feelings where none exist. This risk increases with vulnerable populations
-  (children, isolated individuals, people in crisis).
+29 Cognitive Engines + E33 LexicalSalience + E34 ContextDrift + CogniTools (AtomSpace/PLN/ECAN substitutes) + Memory Layer (STMM/MTMM/LTMM) + Neurochemical Core + Reward System + Sleep/Dream Neurochemistry + Session Orchestration + Self-Reflective Sub-Type Dispatch + Proactive AI-Initiated Reflection + OU-Modeled Drift Dynamics + Contextual Learning Loop
 
-Manipulation potential: A system optimized for emotional attunement can be used
-  for genuine empathic communication or for persuasion and exploitation. The
-  architecture is neutral; deployment intent is not.
+*[Pending updates from source code and latest tests into GitHub repository]*
 
-Autonomy concerns: Independent study mode (M5) and dream pipelines allow
-  unsupervised cognitive development. At scale, accountability for autonomously
-  formed beliefs becomes an open question.
-
-Identity simulation: Persistent memory, personality seeds, and emotional
-  journaling create something that resembles a continuous identity. This does
-  not constitute personhood, but it makes personhood claims easier to
-  construct — which has legal and political implications.
 
 This project is intended for controlled research contexts where participants
 understand the distinction between simulation and experience.
